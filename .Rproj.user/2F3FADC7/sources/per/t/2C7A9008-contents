@@ -1,0 +1,134 @@
+library(readxl)
+library(readr)
+library(dplyr)
+library(splines)
+library(lubridate)
+library(ggplot2)
+library(nlme)
+
+gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
+colnames(gaz) <- c("date", "day_in_yr", "nextdate", "rate")
+#View(gaz)
+
+weather <- read_csv("weather.csv")
+
+data <- left_join( weather, gaz, by = "date")
+
+dat_c <- data[complete.cases(data[,c(2,14)]),]
+
+smooth.spline( dat_c$tavg, dat_c$rate) %>% plot(type = "l")
+plot( dat_c$tavg, dat_c$rate)
+abline( h= .5)
+
+data$rate[data$tmin>20] <- .5
+dat_c <- data[complete.cases(data[,c(2,14)]),]
+smooth.spline( dat_c$tavg, dat_c$rate) %>% plot(type = "l")
+plot( dat_c$tavg, dat_c$rate)
+
+dat_c$ywint <- as.factor(year(dat_c$date - 180*3600*24))
+dat_c$ablak <- ifelse( dat_c$date > as.Date("2020-11-25"), 1, 0)
+
+(cor(dat_c[,c(2:5,7:10, 12, 14)], use = "pairwise.complete.obs"))
+
+mod1 <- lm( rate ~ ns( tavg, df = 2) + ywint , dat_c)
+plot(effects::predictorEffects(mod1, partial.residuals = TRUE))
+summary(mod1)
+BIC(mod1)
+car::vif(mod1)
+
+cs <- c()
+for (i in 0:5) {
+  cs <- c( cs, cor( dat_c$tavg[1:(nrow(dat_c)-i)], dat_c$rate[(i+1):nrow(dat_c)]))
+}
+plot(cs, type = "l") # no meaningful change
+
+
+dat_d <- dat_c[dat_c$tmin < 20,]
+
+mod2 <- lm( rate ~ ns( tavg, df = 2) + ywint , dat_d)
+plot(effects::predictorEffects(mod2, partial.residuals = TRUE))
+BIC(mod2)
+car::vif(mod2)
+plot(mod2,1)
+
+
+mod3 <- lm( rate ~ ns( tavg, df = 2) + ywint  #+ ns(day_in_yr, df = 3)
+            , dat_d)
+#vö. "napsütötte órák száma", de túl "csúcsos" a spline
+
+mod3 <- gls( rate ~ ns( tavg, df = 3) * ywint  #+ ns(day_in_yr, df = 3)
+            , dat_d
+            #, correlation = corAR1()
+            , weights = varPower()
+            #, glsControl(tolerance=.0001)
+            )
+
+se <- sqrt((predict(mod3)^2*mod3$modelStruct$varStruct))
+
+plot(effects::predictorEffects(mod3, partial.residuals = TRUE))
+BIC(mod3)
+car::vif(mod3)
+
+
+
+pred <- predict(mod2, se.fit = TRUE, interval = "prediction")$fit
+pred2 <- predict(mod3)
+plot(pred[,1],pred2[])
+
+dat_p <- cbind( dat_d, pred)
+dat_p$fit[dat_p$fit < .5] <- .5
+dat_p$lwr[dat_p$lwr < .5] <- 0
+dat_p$date <- as.Date(dat_p$date)
+plot(dat_p$date,dat_p$fit, type = "l")
+
+
+ggplot( dat_p, aes( x = date, y = rate)) +
+  theme_bw() +
+  geom_line( color = "grey30", size = 1.5) +
+  geom_line( aes( y = fit), color = "darkblue") +
+  geom_ribbon( aes(ymin = lwr, ymax = upr), alpha = .2, fill = "darkblue")
+
+
+ggplot( dat_p, aes( x = date, y = rate)) +
+  theme_bw() +
+  geom_line( color = "grey30", size = 1.5) +
+  geom_line( aes( y = fit), color = "darkblue") +
+  geom_ribbon( aes(ymin = lwr, ymax = upr), alpha = .2, fill = "darkblue") +
+  scale_x_date( limits = c( max(dat_p$date)-56, max(dat_p$date)) )
+
+dat_e <- cbind(dat_d, pred)
+
+plot( dat_e$tavg[dat_e$ywint == "2020"], dat_e$fit[dat_e$ywint == "2020"])
+
+lm(  dat_e$tavg[dat_e$ywint == "2021"] ~ dat_e$fit[dat_e$ywint == "2021"])
+
+mod4 <- gls( rate ~ ns( tavg, df = 1) + ywint, 
+             dat_d
+             ,weights = varExp(form = ~ tavg, value = -.04)#, fixed = TRUE)
+             ,correlation = corARMA(p=0,q=1,value = .75, form = ~ day_in_yr | ywint)#, fixed = TRUE)
+             )
+
+summary(mod4)
+
+plot(mod4)
+qqnorm(mod4,abline=c(0,1))
+
+mod4 %>% effects::predictorEffects() %>% plot
+
+mod4 %>% effects::predictorEffects(residuals=TRUE) %>% plot
+
+rate <- mod4 %>% effects::predictorEffects() %>% 
+  .$tavg %>% 
+  .$fit
+
+t <- mod4 %>% effects::predictorEffects() %>% 
+  .$tavg %>% 
+  .$variable %>% 
+  .$tavg %>%
+  .$levels
+
+simp_out <- data.frame( rate = rate,
+                        t    = t)
+
+save(simp_out,file ="pred_rate.rdata")
+

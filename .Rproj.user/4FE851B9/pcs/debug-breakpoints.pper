@@ -1,0 +1,21 @@
+{
+    "debugBreakpointsState": {
+        "breakpoints": [
+            {
+                "id": 0,
+                "path": "C:/OneDrive_DKM/-/Dinamikus Kiválóság Menedzsment - General/Stats_R/R/Martys gas/R/transform_meteostat_weather.r",
+                "line_number": 121,
+                "function_steps": "",
+                "function_name": "merge_transform_weather",
+                "state": 2,
+                "editor_state": 2,
+                "editor_line_number": 121,
+                "is_pending_debug_completion": false,
+                "needs_updated_steps": false,
+                "type": 0,
+                "is_package_breakpoint": false,
+                "package_name": ""
+            }
+        ]
+    }
+}

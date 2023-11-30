@@ -1,0 +1,27 @@
+{
+    "id": "A3CA53CE",
+    "path": "C:/OneDrive_DKM/-/Dinamikus Kiválóság Menedzsment - General/Stats_R/R/Martys gas/R/transform_meteostat_weather.r",
+    "project_path": "R/transform_meteostat_weather.r",
+    "type": "r_source",
+    "hash": "1895640400",
+    "contents": "",
+    "dirty": false,
+    "created": 1701192139976.0,
+    "source_on_save": false,
+    "relative_order": 9,
+    "properties": {
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "152,69",
+        "scrollLine": "137"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1701362107,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1701362107879,
+    "read_only": false,
+    "read_only_alternatives": []
+}

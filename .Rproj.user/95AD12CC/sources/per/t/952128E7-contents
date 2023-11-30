@@ -1,0 +1,111 @@
+---
+title: "Quickreport"
+author: "Dr. Kiss Márton"
+date: '2022-09-23'
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, 
+                      cached = FALSE, ###!!!
+                      warning = FALSE, 
+                      message = FALSE, 
+                      fig.align = 'center',
+                      fig.fullwidth = TRUE,
+                      out.width = '100%', 
+                      fig.asp = .75,
+                      dpi = 300 #@600: awesome pics, slow
+                      )
+```
+
+```{r}
+# DEPENDSON: iter6_mods.r
+
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+source(here::here("iter6_mods.r"))
+#load(here::here("iter6_mods.rdata"))
+
+```
+
+$~$
+
+The realized temperature was different from the expected up to this point by **`r TEMP_DIFF %>% round( digits = 2)`** °C.
+Our aim is to curb gas consumption by 1730/2500 ; **`r 1730/2500*100`%**.  
+
+We have used up **`r round(USED_UP,digits = 1)`m3** gas (**`r round(USED_UP/1730*100,digits = 1)`%**).
+
+We have predicted to have used up **`r round(preduse_corr)`m3** of gas without intervention, and have targeted a gas use of **`r round(preduse_targ)`m3**.
+
+Up to this point, our gas consumption compared to the previous seasons' (ratio):
+
+$~$
+
+```{r}
+
+paste0( round( USED_UP / (preduse_corr) * 100, digits = 2), "%")
+
+```
+
+$~$
+
+Which translates to a gas consumption compared to the levels needed for targeted consumption (ratio):
+
+$~$
+
+```{r}
+
+paste0( round( USED_UP / (preduse_targ) * 100, digits = 2), "%")
+
+```
+
+Taking into consideration the realized temperatures, the realized ratio of gas consumption compared to that needed for the season (this would be more lenient if it was colder than expected):
+
+```{r}
+
+# consumption / predicted cons. based on actual temps corrected for 1730
+paste0( round( 
+  sum(pred_realiz$Rate, na.rm=TRUE) / (sum( pred_realiz$gas, na.rm=TRUE) * correction * const_0)
+  * 100, digits = 2), "%")
+
+```
+
+```{r}
+
+fig_1
+
+```
+
+
+```{r}
+
+fig_2
+
+```
+
+
+```{r}
+
+fig_3
+
+```
+
+
+```{r}
+
+fig_4
+
+```
+
+
+```{r}
+
+fig_5_ojj %>% plot()
+
+```
+
+
