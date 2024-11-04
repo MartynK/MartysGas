@@ -19,4 +19,4 @@ load_all_Rdata <- function(directory) {
   }
 }
 
-load_all_Rdata(directory=here::here("inst","example_quarto","backend")) # Load slow suff's output
+#load_all_Rdata(directory=here::here("inst","example_quarto","backend")) # Load slow suff's output

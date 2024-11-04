@@ -1,7 +1,7 @@
 {
     "installOptions": {
         "installFromRepository": true,
-        "libraryPath": "C:/R_stuff/_Libraries/4.2",
+        "libraryPath": "C:/OneDrive_DKM/-/Dinamikus Kiválóság Menedzsment - General/Stats_R/R/_Libraries/4.3",
         "installDependencies": true
     }
 }

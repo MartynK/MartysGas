@@ -1,0 +1,834 @@
+---
+title: "child2"
+format: docx
+editor: visual
+---
+
+# Quantifying cold and long winters
+
+The amount of energy required for heating is the function of the outside temperature.
+
+Therefore to predict the energy needs left in a given (heating) season, we should make a prediction about the expected amount of energy required until the end of the season.
+
+Thankfully things seem to be straightforward if we assume that the inside temperature of the building should be constant (it's not but bear with me). Assume 20°C (68°F). Heat loss is linear to the difference in temperature between the inside and outside temperatures [link](http://hyperphysics.phy-astr.gsu.edu/hbase/thermo/heatloss.html).
+
+Therefore when the outside temperature is 16°C we would need 4x the power to heat the building than if it would be 19°C. Also, this amount of energy needed for these two days is the same that we would need for heating for 3 days if it were $20 - 5/3 = 18.33$ degrees outside. In other words for a given heating season, we would add up the "missing degrees" until 20 for every day the outside temperature was less than 20°.
+
+```{r}
+
+source( here::here( "inst", "function", "load_stuff.r"))
+
+act_year <- 2023
+
+get_approx_meter <-  approxfun(obs_readings$Date,
+                               obs_readings$Value_trf, 
+                               rule = 2, na.rm = TRUE)
+
+get_approx_rate <- function(x) {
+  # dx get_approx_meter
+  h <- 1e-6
+  return((get_approx_meter(x + h) - get_approx_meter(x)) / h)
+}
+
+get_avg_temp <- function( df = obs_days, var = "tavg", var_time = "Date",
+                          xmin, xmax) {
+  f <- approxfun( df[var_time][[1]], df[var][[1]])
+  integrated <- integrate( f, subdivisions = 10000,
+                           #stop.on.error = FALSE,
+                           rel.tol = 0.1,
+                           lower = xmin, upper = xmax)$value
+  duration <- xmax - xmin
+  return( integrated / duration)
+}
+
+
+obs_days <- obs_days %>%
+  mutate(Meter = get_approx_meter(Date),
+         Rate = get_approx_rate(Date)*3600*24) %>%
+  group_by(ywint) %>%
+  mutate( Spent = Meter - min(Meter, na.rm = TRUE),
+          Spent_perc = ifelse( year(Date) == act_year,
+                               Spent / 1730,
+                               Spent / max(Spent, na.rm = TRUE)))
+
+```
+
+We have a pesky issue with  missing data (sometimes every 2nd or 3rd date has results in the 90's). The below step is quite rudimentary, doing linear interpolation between existing datapoints. This would capture the high autocorrelation between dates but it ain't perfect.
+
+```{r}
+
+# Step 1: Create a complete date sequence
+complete_dates <- 
+  data.frame(Date = seq(from = min(obs_days$Date), to = max(obs_days$Date), by = "day"))
+
+# Step 2: Expand your dataframe
+obs_days_complete <- 
+  left_join(complete_dates, obs_days,by="Date")
+  
+
+# Assuming 'obs_days_complete' is your dataframe
+for (i in 2:ncol(obs_days_complete)) {  # Starting from 2 to skip the Date column
+  
+  # Extract dates and values for the current column
+  dat <- obs_days_complete$Date
+  
+  if( colnames(obs_days_complete)[i] == "ywint") { 
+    val <- as.numeric(obs_days_complete[, i])
+  } else {
+    val <- obs_days_complete[, i]
+  }
+
+  # Create the interpolation function only for non-NA values
+  valid_idx <- !is.na(val)
+  if(sum(valid_idx) > 1) {  # Ensure there are at least two points for interpolation
+    fun. <- approxfun(x = dat[valid_idx], y = val[valid_idx], rule = 2)
+    
+    # Apply the function to interpolate NA values
+    obs_days_complete[, i] <- ifelse(is.na(val), fun.(dat), val)
+  }
+}
+
+obs_days_complete <- obs_days_complete %>%
+  arrange(Date) %>%
+  mutate(tavg_capped = ifelse(tavg < 20, tavg, 20),
+         tavg_low_cumul = 0)
+
+
+##Uncomment the txtprogressbar stuff to get the progress bar (looks bad in the actual report)
+#pb <- txtProgressBar(style=3)
+for (i in 2:nrow(obs_days_complete)) {
+  if ( obs_days_complete$day_in_wint[i] >= obs_days_complete$day_in_wint[i-1]) {
+    obs_days_complete$tavg_low_cumul[i] <- 
+      obs_days_complete$tavg_low_cumul[i - 1] - obs_days_complete$tavg_capped[i] + 20
+  } else {
+    # in case of a new year, its automatically zero
+    obs_days_complete$tavg_low_cumul[i] <- obs_days_complete$tavg_capped[i] - 20
+  }
+  #setTxtProgressBar(pb,i/nrow(obs_days_complete))
+}
+#close(pb)
+
+obs_days_complete <- obs_days_complete %>%
+  mutate(ywint = as.factor( ywint))
+
+# There are some edge cases I have to take care of (due to leap years)
+obs_days_complete$tavg_low_cumul[obs_days_complete$ywint==1] <- NA
+obs_days_complete$tavg_low_cumul[obs_days_complete$day_in_wint > 180 &
+                                  obs_days_complete$tavg_low_cumul < 100] <- NA
+
+
+```
+
+
+```{r}
+
+obs_days_complete %>%
+  ggplot(aes(x = day_in_wint, y = tavg_low_cumul
+  )) +
+  theme_bw() +
+  geom_line(alpha=.7, mapping = aes(
+    color = year
+    ,fill=year
+    ,group = factor(ywint))) +
+  labs( x = "Day in the season (starts Aug.1st)",
+        y = "Heating energy needs [°C*Day]")
+
+```
+
+I personally like this approach very much, but of course we are neglecting:
+
+-   The effects of solar radiation, eg. sunlight heats up the building a bit,
+-   the building's heat capacity, eg. after a hot summer's day, it takes about 3 days for the walls to cool
+
+For simplicity and to retain my sanity, lets also assume that at each timepoint (day), the distribution of 'energy needs' is normal.
+
+::: callout-important
+The evolution of the energy needs *may* be thought of as logistic growth but I'm not exploring that at this time.
+:::
+
+I'd like to fit a *linear model* for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I'd opt for a *generalized least squares* model with an *exponential variance structure* (meaning that the residuals are understood to have a larger variance when more days have elapsed). Its not perfect, since at the end of the season (june, july) not much heating is going on and therefore variance tends to taper off there.
+
+```{r}
+
+mod_cum <- gls(tavg_low_cumul ~ ns(day_in_wint,df=8),
+               obs_days_complete,
+               weights=varExp(form = ~ day_in_wint),
+               na.action = na.omit)
+
+#summary(mod_cum)
+mod_cum %>% effects::predictorEffects(partial.residuals=FALSE) %>% plot
+plot(mod_cum)
+
+```
+
+I could not, for the life of me got the *prediction intervals* correctly out of the model which would expand over the course of the elapsed days. One potential solution would be the package *AICcmodavg* but it threw an error (possibly because I used *tibbles* for my data; solution is trivial, but not going to implement it).
+
+As a "petty craftsman" kind of approach, I calculated standard deviations for all days and then fitted a *linear model* over it with a natural spline term capturing the evolution of standard deviation in heating needs over the course of a season.
+
+```{r}
+
+sds <- data.frame(
+  day_in_wint = 1:364,
+  sd_obs = NA
+)
+
+for (i in 1:nrow(sds)) {
+  sds$sd_obs[i] <- 
+    obs_days_complete %>% 
+      filter(day_in_wint == sds$day_in_wint[i]) %>% 
+        .$tavg_low_cumul %>% 
+          sd(na.rm = TRUE)
+}
+mod_cum_obs <- lm( sd_obs ~ ns(day_in_wint,df=5) - 1
+                   ,sds)
+
+sds$sd_pred <- predict(mod_cum_obs)
+sds$mean_pred <- predict(mod_cum, newdata = sds)
+
+mod_cum_obs %>% 
+  effects::predictorEffects(
+    partial.residuals = TRUE
+    ) %>% 
+  plot()
+
+```
+
+Now we have a mean and a variance for the cumulative heating energy needs on any given day (at my location)! I can then assign a z-score for each result through the years.
+
+```{r}
+
+sd_fun <- approxfun(sds$day_in_wint,sds$sd_pred)
+mean_fun <- approxfun(sds$day_in_wint,sds$mean_pred)
+
+return_std_tmp <- function(day_act, tmp_act) {
+  m <- mean_fun(day_act)
+  s <- sd_fun(day_act)
+  return(list(
+    z = (tmp_act - m) / s,
+    z_perc = pnorm((tmp_act - m) / s)
+  ))
+}
+
+obs_days_complete <- 
+  obs_days_complete %>%
+    mutate(z = return_std_tmp(day_in_wint,tavg_low_cumul)[["z"]],
+           z_perc = return_std_tmp(day_in_wint,tavg_low_cumul)[["z_perc"]])
+
+```
+
+```{r}
+
+
+obs_days_complete %>%
+  ggplot(aes(x = day_in_wint, y = tavg_low_cumul
+             )) +
+  theme_bw() +
+  geom_line(alpha=.7, mapping = aes(
+    color = year
+    ,fill=year
+    ,group = factor(ywint))) +
+  geom_line(data = sds, mapping = aes(y = mean_pred),color='salmon4',linewidth=1.5) +
+  geom_line(data = sds, mapping = aes(y = mean_pred + 1.96 * sd_pred),color='red',linewidth=1.5) +
+  geom_line(data = sds, mapping = aes(y = mean_pred - 1.96 * sd_pred),color='red',linewidth=1.5)
+
+
+```
+
+
+# Estimating total energy needs left on a given day
+
+This is all well and good, and this translates to an estimated total energy need at the beginning of a season, but we are mainly interested in the *conditional* energy need for the total season if we have observed the cumulative energy need up to day "*d".*
+
+I start with investigating how do energy need values observed on a given day *correlate* to the *total* energy need for a given season. Specifically, what was the correlation between the z-scores of a given day vs. the last day in a season.
+
+```{r}
+
+final_z <- 
+  obs_days_complete %>% 
+    filter(day_in_wint == 364) %>% 
+      mutate(id = 1:n())
+sds$cor_z <- NA
+for (i in 1:364) {
+  act_z <- 
+    obs_days_complete %>% 
+      filter(day_in_wint == i) 
+  
+  if ( i < 155) {
+    act_z <- act_z %>%
+        mutate(id=2:(n()+1)) %>%
+          left_join(y=final_z,by="id")
+  } else {
+    act_z <- act_z %>%
+      mutate(id=1:n()) %>%
+      left_join(y=final_z,by="id")
+  }
+  
+  sds$cor_z[i] <- cor(act_z$z.x,act_z$z.y,use="pairwise.complete.obs")
+}
+
+sds %>%
+  ggplot(aes(x=day_in_wint,y=cor_z)) +
+    theme_bw() +
+    geom_line() #+
+    #geom_smooth(alpha=.2)
+
+```
+
+The spike around day 150 is due to leap years (probably); didn't bother to fix it, as it didn't bother the results much. I fit a linear model with a spline for this relationship, like before.
+
+```{r}
+
+
+mod_cor <- lm(cor_z~ns(day_in_wint,df=3) - 1,sds)
+#summary(mod_cor)
+sds$cor_z_pred <- predict(mod_cor, newdata = sds)
+sds <- sds %>% mutate(cor_z_pred = cor_z_pred/max(cor_z_pred,na.rm=TRUE))
+
+mod_cor %>% effects::predictorEffects(partial.residuals=TRUE) %>% plot()
+
+```
+
+Sooo.... we are searching for the *Y* normal distribution, which is correlated by *c* with the normal distribution *X*, then
+
+$mean(Y)|(X=x) = c * x$  
+
+$variance(Y)|(X=x) = (1 - c^2)*variance(Y)$
+
+Lets fix day n the season as *173* and the cumulated energy need thus far as *1530* (beginning of January, 2024). I'm not a 100% that I've implemented the intermediate values the right way, but I am sure about the end state (at Day 365). Level of significance is at 5% (hence the 1.96x SD part).
+
+```{r}
+
+conf_lev <- 1.96
+day_in_wint_act <- 173
+cum_t_act <- 1530
+
+cor_fun <- approxfun(sds$day_in_wint,sds$cor_z_pred)
+cor_act <- cor_fun( day_in_wint_act)
+sd_expected  <- sqrt( 1 - cor_act^2) 
+z_act <- return_std_tmp(day_in_wint_act, cum_t_act)$z
+z_expected <- cor_act * z_act
+
+# lower_expected_std <- z_expected - conf_lev * sd_expected
+# upper_expected_std <- z_expected + conf_lev * sd_expected
+
+expecteds <- 
+  data.frame(day_in_wint = day_in_wint_act:364) %>%
+  left_join(y=sds,by="day_in_wint") %>%
+  mutate(prop_var = (cor_z_pred - cor_act) / (1 - cor_act),
+         sd_act   = sd_expected * prop_var,
+         z_act.   = seq(z_act,z_expected,length.out=n()),
+         lower_expected = mean_fun(day_in_wint) + (z_act. - sd_act*conf_lev)*sd_fun(day_in_wint),
+         upper_expected = mean_fun(day_in_wint) + (z_act. + sd_act*conf_lev)*sd_fun(day_in_wint)
+         )
+
+
+```
+
+```{r}
+
+predict_future_needs <- function(
+    conf_lev = 1.96,
+    day_in_wint_act = 173,
+    cum_t_act = 1530,
+    sds. = sds,
+    full = TRUE
+) {
+  
+  cor_fun <- approxfun(sds.$day_in_wint,sds.$cor_z_pred)
+  cor_act <- cor_fun( day_in_wint_act)
+  sd_expected  <- sqrt( 1 - cor_act^2) 
+  z_act <- return_std_tmp(day_in_wint_act, cum_t_act)$z
+  z_expected <- cor_act * z_act
+  
+  # lower_expected_std <- z_expected - conf_lev * sd_expected
+  # upper_expected_std <- z_expected + conf_lev * sd_expected
+  
+  if (full == FALSE) {
+    dayz <- 364
+  } else {
+    dayz <- day_in_wint_act:364
+  }
+  
+  
+  expecteds <- 
+    data.frame(day_in_wint = dayz) %>%
+    left_join(x = ., y=sds.,by="day_in_wint") %>%
+    mutate(prop_var = (cor_z_pred - cor_act) / (1 - cor_act),
+           sd_act   = sd_expected * prop_var,
+           z_act.   = seq(z_act,z_expected,length.out=n()),
+           lower_expected = mean_fun(day_in_wint) + (z_act. - sd_act*conf_lev)*sd_fun(day_in_wint),
+           upper_expected = mean_fun(day_in_wint) + (z_act. + sd_act*conf_lev)*sd_fun(day_in_wint)
+           )
+
+  return(expecteds)
+}
+
+
+```
+
+```{r}
+
+obs_days_complete %>%
+  ggplot(aes(x = day_in_wint, y = tavg_low_cumul
+  )) +
+  theme_bw() +
+  geom_line(alpha=.7, mapping = aes(
+    color = year
+    ,fill=year
+    ,group = factor(ywint))) +
+  geom_line(data = sds, mapping = aes(y = mean_pred),
+            color='salmon4',linewidth=1.5) +
+  geom_line(data = sds, mapping = aes(y = mean_pred + 1.96 * sd_pred),
+            color='red',linewidth=1.5) +
+  geom_line(data = sds, mapping = aes(y = mean_pred - 1.96 * sd_pred),
+            color='red',linewidth=1.5) +
+  geom_point(data = expecteds,mapping=aes(y=lower_expected),color = "green") +
+  geom_point(data = expecteds,mapping=aes(y=upper_expected),color = "green") +
+  geom_point(mapping = aes( x = day_in_wint_act, y =cum_t_act),color="green") 
+
+
+
+```
+
+
+I can therefore construct an interval estimate of how much energy I still need to burn in this heating season (how much 'coldness' there will be before summer). I prefer to see the realized energy need as a percentage of what can be expected in total. 
+
+
+```{r}
+
+# Percent heating req. elapsed (lower bound)
+expecteds %>%
+  last %>%
+  mutate(result = cum_t_act / upper_expected) %>%
+  .$result
+
+# Percent heating req. elapsed (upper bound)
+expecteds %>%
+  last %>%
+  mutate(result = cum_t_act / lower_expected) %>%
+  .$result
+
+```
+
+It seems that up until this point we have experienced 47-57% of our total energy need for heating this season.
+
+# Figuring in actual energy usage
+
+## First approximation based on data from a given season
+
+I have everything I need to make predictions about the expected total amount of *gas* I need for the rest of the year. For each day, I make an interval prediction for the total energy requirement for the year, I calculate the remaining portion of this need, and I estimate the amount of gas I need for this portion, given that I used up *V* amount of gas for *Q* amount of heating.
+
+The method isn't perfect. I seem to get reliable estimates around 1 month into winter. There are multiple potential reasons:
+ - The house has a ton of heat capacity, and I don't actually need to heat it if the mean temperature drops to ~19° for a day or two. This makes the realized 'energy needs' conservative in the autumn/spring.
+ - I use the heat pump for heating sometimes when the temperature difference isn't huge (and therefore the heat pump is crazy efficient). This inflates the estimated energy needs further when the temperature difference is low (autumn/summer). 
+
+The resulting estimates are quite cool though. 
+
+```{r}
+
+hotwater_per_day <- 0.5
+budget_heating <- 1730 - hotwater_per_day * 365
+
+act_year_fac <- 
+  obs_days_complete %>% 
+  filter( year == act_year) %>% 
+  slice_tail(n=1) %>% 
+  .$ywint
+
+
+a <- 
+obs_days_complete %>%
+  filter( ywint == act_year_fac) %>%
+  .[-1,] %>%
+  rowwise() %>%
+  mutate(expected_upper_energy_needs = predict_future_needs(
+            day_in_wint = day_in_wint,
+            cum_t_act = tavg_low_cumul,
+            full=FALSE)[["upper_expected"]],
+        expected_lower_energy_needs = predict_future_needs(
+            day_in_wint = day_in_wint,
+            cum_t_act = tavg_low_cumul,
+            full=FALSE)[["lower_expected"]]) %>%
+  mutate(gas_heating = Spent - day_in_wint * hotwater_per_day,
+         predicted_total_upper_gas_needs = 
+           (expected_upper_energy_needs/tavg_low_cumul)*gas_heating,
+         predicted_total_lower_gas_needs = 
+           (expected_lower_energy_needs/tavg_low_cumul)*gas_heating) 
+
+
+
+a %>%
+  # Capping the predictions between 0 and 3000
+  mutate(predicted_total_upper_gas_needs = 
+           ifelse(predicted_total_upper_gas_needs > 3000, 3000,
+                predicted_total_upper_gas_needs),
+         predicted_total_upper_gas_needs = 
+           ifelse(predicted_total_upper_gas_needs < 0, 0,
+                predicted_total_upper_gas_needs),
+         
+         predicted_total_lower_gas_needs = 
+           ifelse(predicted_total_lower_gas_needs > 3000, 3000,
+                predicted_total_lower_gas_needs),
+         predicted_total_lower_gas_needs = 
+           ifelse(predicted_total_lower_gas_needs < 0, 0,
+                predicted_total_lower_gas_needs)) %>%
+  # Doing the plot
+  ggplot(aes(x=Date,
+             y=predicted_total_upper_gas_needs)) +
+    tidyquant::theme_tq() +
+    geom_line() +
+    geom_line(mapping = aes(y=predicted_total_lower_gas_needs)) +
+    geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+                                         length.out = 300),
+              predicted_total_upper_gas_needs = last(a$predicted_total_upper_gas_needs)),
+              linetype = "dotted", linewidth= 1.1, color = "salmon") +
+      geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+                                         length.out = 300),
+              predicted_total_upper_gas_needs = last(a$predicted_total_lower_gas_needs)),
+              linetype = "dotted", linewidth= 1.1, color = "salmon") +
+    geom_hline(yintercept = 1730-0.5*365, color = "salmon4") +
+    scale_x_datetime(limits = c(min(a$Date),min(a$Date)+days(365)),
+                     date_labels = "%Y-%m",
+                     date_breaks = "2 months") +
+    labs( y = "Predicted total gas needs (m3)",
+          title = "Predictions for the year per day")
+
+
+
+
+
+
+```
+
+The width of the confidence interval is decreasing after a point too, I hope it reaches '0' when the year is done.
+
+```{r}
+
+# plot(max(0,a$predicted_total_upper_gas_needs-a$predicted_total_lower_gas_needs),
+#      type = 'l')
+
+```
+
+
+## Second approximation - using data from previous years
+
+
+```{r}
+
+obs_days_complete %>%
+  filter( Spent > 0) %>%
+  mutate( Spent_per_q = (Spent - hotwater_per_day * day_in_wint) / tavg_low_cumul) %>%
+  ggplot(aes(x = day_in_wint,y= Spent_per_q,color = year)) +
+    tidyquant::theme_tq() +
+    geom_point() +
+    scale_y_continuous(limits = c(0,1)) +
+    geom_smooth(method="loess",span=2,color = "red")
+
+```
+
+```{r}
+
+b <- 
+  obs_days_complete %>%
+    filter( day_in_wint >= 364,
+            Spent > 0) %>%
+    arrange(desc(year)) %>%
+    mutate( Spent_per_q = (Spent - hotwater_per_day * day_in_wint) / tavg_low_cumul,
+            wght = 1/row_number()^2) 
+
+spent_per_q_wght <- sum(b$Spent_per_q  * b$wght) / sum(b$wght)  
+
+b %>%
+  ggplot(aes(x=year,y=Spent_per_q)) +
+    tidyquant::theme_tq() +
+    geom_point(size=2) +
+    geom_hline(yintercept = spent_per_q_wght, color = "salmon4")
+
+```
+
+```{r}
+
+# a_comp <- 
+#   obs_days_complete %>%
+#   filter(day_in_wint > 1,
+#          Date >= "2018-08-01") %>%
+#   group_by(ywint) %>%
+#   mutate( spent_year = max(Spent)) %>%
+#   ungroup() %>%
+#   rowwise() %>%
+#   mutate(expected_upper_energy_needs = predict_future_needs(
+#             day_in_wint = day_in_wint,
+#             cum_t_act = tavg_low_cumul,
+#             full=FALSE)[["upper_expected"]],
+#         expected_lower_energy_needs = predict_future_needs(
+#             day_in_wint = day_in_wint,
+#             cum_t_act = tavg_low_cumul,
+#             full=FALSE)[["lower_expected"]]) %>%
+#   mutate(gas_heating = Spent - day_in_wint * hotwater_per_day,
+#          predicted_total_upper_gas_needs = 
+#            (expected_upper_energy_needs/tavg_low_cumul)*gas_heating,
+#          predicted_total_lower_gas_needs = 
+#            (expected_lower_energy_needs/tavg_low_cumul)*gas_heating
+#          ) 
+# 
+# a_comp <- 
+#   a_comp %>%
+#     ungroup() %>%
+#     group_by(ywint) %>%
+#     rowwise() %>%
+#     mutate(
+#            predicted_total_upper_gas_needs =
+#              max(0,predicted_total_upper_gas_needs),
+#            predicted_total_lower_gas_needs =
+#              max(0,predicted_total_lower_gas_needs),
+#            pred_gas_range = predicted_total_upper_gas_needs -
+#                               predicted_total_lower_gas_needs,
+#            pred_energy_range = expected_upper_energy_needs -
+#                                  expected_lower_energy_needs
+#            ) %>%
+#     filter( !is.na(predicted_total_upper_gas_needs),
+#             is.finite(predicted_total_upper_gas_needs)
+#             )
+# 
+# cors <- data.frame( dwint = 2:362,
+#                     cor = NA,
+#                     cor2 = NA)
+# 
+# for (i in 1:364) {
+#   cors$cor[i] <- a_comp %>% ungroup() %>%
+#     filter(day_in_wint == cors$dwint[i]) %>%
+#     dplyr::select(spent_year, predicted_total_upper_gas_needs) %>% 
+#     cor( use = "pairwise.complete.obs") %>% .[1,2]
+#   
+#     cors$cor2[i] <- a_comp %>% ungroup() %>%
+#     filter(day_in_wint == cors$dwint[i]) %>%
+#     dplyr::select(spent_year, predicted_total_upper_gas_needs) %>% 
+#     cor( use = "pairwise.complete.obs") %>% .[1,2]
+#   
+# }
+# 
+# 
+# mod <- lme(spent_year ~ 
+#             ns(expected_upper_energy_needs ,df=1) 
+#             + ns(expected_lower_energy_needs ,df=1) 
+#             #+ ns(predicted_total_upper_gas_needs,df=2)
+#             #+ ns(pred_gas_range,df=1)
+#             #+ ns(pred_energy_range,df=1)
+#             + ns(day_in_wint, df = 2)
+#           ,
+#           a_comp,
+#           random = ~1|ywint,
+#           #weights = varPower(form = ~day_in_wint),
+#           control = lmeControl(maxIter = 200, msMaxIter = 200)
+#           )
+# 
+# summary(mod)
+# mod %>% effects::predictorEffects(partial.residuals=TRUE) %>% plot
+# 
+# car::vif(mod)
+# 
+# pr <- predict(mod,interval="prediction",se.fit =TRUE)
+# 
+# emmeans::emm(mod)
+
+
+```
+
+
+
+```{r}
+
+
+# a %>%
+#   # Capping the predictions between 0 and 3000
+#   mutate(predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs > 3000, 3000,
+#                 predicted_total_upper_gas_needs),
+#          predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs < 0, 0,
+#                 predicted_total_upper_gas_needs),
+#          
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs > 3000, 3000,
+#                 predicted_total_lower_gas_needs),
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs < 0, 0,
+#                 predicted_total_lower_gas_needs)) %>%
+#   # Doing the plot
+#   ggplot(aes(x=Date,
+#              y=predicted_total_upper_gas_needs)) +
+#     tidyquant::theme_tq() +
+#     geom_line() +
+#     geom_line(mapping = aes(y=predicted_total_lower_gas_needs)) +
+#     geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_upper_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#       geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_lower_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#     geom_hline(yintercept = 1730-0.5*365, color = "salmon4") +
+#     scale_x_datetime(limits = c(min(a$Date),min(a$Date)+days(365)),
+#                      date_labels = "%Y-%m",
+#                      date_breaks = "2 months") +
+#     labs( y = "Predicted total gas needs (m3)",
+#           title = "Predictions for the year per day")
+
+```
+
+
+```{r}
+
+# SWITCH_DAY <- 120
+# 
+# return_method_weight <- function(x = 200, 
+#                                  method_switch_day = SWITCH_DAY, 
+#                                  window = 60) {
+#   if (x < method_switch_day - window / 2) {
+#       return(0)
+#     } else if (x > method_switch_day + window / 2) {
+#       return(1)
+#     } else {
+#       return( 
+#         (sin((x - (method_switch_day-window/2))/window*pi-pi/2)+1)/2
+#       )
+#     }
+# }
+# Return_method_weight <- Vectorize(return_method_weight, vectorize.args = "x")
+# #plot(Return_method_weight(1:365))
+# 
+# 
+# a <- 
+# obs_days_complete %>%
+#   filter( ywint == act_year_fac) %>%
+#   .[-1,] %>%
+#   rowwise() %>%
+#   mutate(expected_upper_energy_needs = predict_future_needs(
+#             day_in_wint = day_in_wint,
+#             cum_t_act = tavg_low_cumul,
+#             full=FALSE)[["upper_expected"]],
+#         expected_lower_energy_needs = predict_future_needs(
+#             day_in_wint = day_in_wint,
+#             cum_t_act = tavg_low_cumul,
+#             full=FALSE)[["lower_expected"]]) %>%
+#   mutate(gas_heating = Spent - day_in_wint * hotwater_per_day,
+#          method_weight = Return_method_weight(day_in_wint),
+#          
+#          
+#          predicted_total_upper_gas_needs0 = 
+#            (expected_upper_energy_needs/tavg_low_cumul)*gas_heating,
+#          predicted_total_upper_gas_needs1 = 
+#            spent_per_q_wght * expected_upper_energy_needs,
+#          
+#          predicted_total_lower_gas_needs0 = 
+#            (expected_lower_energy_needs/tavg_low_cumul)*gas_heating,
+#          predicted_total_lower_gas_needs1 = 
+#            spent_per_q_wght * expected_lower_energy_needs,
+#          
+#          
+#          predicted_total_upper_gas_needs = 
+#            method_weight * predicted_total_upper_gas_needs0 + 
+#            (1-method_weight) * predicted_total_upper_gas_needs1,
+#          
+#          
+#          predicted_total_lower_gas_needs = 
+#            method_weight * predicted_total_lower_gas_needs0 + 
+#            (1-method_weight) * predicted_total_lower_gas_needs1)
+
+
+```
+
+```{r}
+
+# a %>%
+#   # Capping the predictions between 0 and 3000
+#   mutate(predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs > 3000, 3000,
+#                 predicted_total_upper_gas_needs),
+#          predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs < 0, 0,
+#                 predicted_total_upper_gas_needs),
+#          
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs > 3000, 3000,
+#                 predicted_total_lower_gas_needs),
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs < 0, 0,
+#                 predicted_total_lower_gas_needs)) %>%
+#   # Doing the plot
+#   ggplot(aes(x=Date,
+#              y=predicted_total_upper_gas_needs0)) +
+#     tidyquant::theme_tq() +
+#     geom_line() +
+#     geom_line(mapping = aes(y=predicted_total_lower_gas_needs0)) +
+#     geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_upper_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#       geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_lower_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#     geom_hline(yintercept = 1547.5, color = "salmon4") +
+#     geom_vline(xintercept = min(a$Date) + days(SWITCH_DAY), color = "salmon4") +
+#     scale_x_datetime(limits = c(min(a$Date),min(a$Date)+days(365)),
+#                      date_labels = "%Y-%m",
+#                      date_breaks = "2 months") +
+#     labs( y = "Predicted total gas needs (m3)",
+#           title = "Predictions for the year per day")
+
+
+
+
+
+
+```
+
+
+```{r}
+
+# a %>%
+#   # Capping the predictions between 0 and 3000
+#   mutate(predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs > 3000, 3000,
+#                 predicted_total_upper_gas_needs),
+#          predicted_total_upper_gas_needs = 
+#            ifelse(predicted_total_upper_gas_needs < 0, 0,
+#                 predicted_total_upper_gas_needs),
+#          
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs > 3000, 3000,
+#                 predicted_total_lower_gas_needs),
+#          predicted_total_lower_gas_needs = 
+#            ifelse(predicted_total_lower_gas_needs < 0, 0,
+#                 predicted_total_lower_gas_needs)) %>%
+#   # Doing the plot
+#   ggplot(aes(x=Date,
+#              y=predicted_total_upper_gas_needs)) +
+#     tidyquant::theme_tq() +
+#     geom_line() +
+#     geom_line(mapping = aes(y=predicted_total_lower_gas_needs)) +
+#     geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_upper_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#       geom_line(data = data.frame(Date=seq(max(a$Date),min(a$Date)+days(365),
+#                                          length.out = 300),
+#               predicted_total_upper_gas_needs = last(a$predicted_total_lower_gas_needs)),
+#               linetype = "dotted", linewidth= 1.1, color = "salmon") +
+#     geom_hline(yintercept = 1547.5, color = "salmon4") +
+#     geom_vline(xintercept = min(a$Date) + days(SWITCH_DAY), color = "salmon4") +
+#     scale_x_datetime(limits = c(min(a$Date),min(a$Date)+days(365)),
+#                      date_labels = "%Y-%m",
+#                      date_breaks = "2 months") +
+#     labs( y = "Predicted total gas needs (m3)",
+#           title = "Predictions for the year per day")
+
+
+
+
+
+
+```
+

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Márton Kiss, MD">
+
+<title>Heating needs</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="report_files/libs/clipboard/clipboard.min.js"></script>
+<script src="report_files/libs/quarto-html/quarto.js"></script>
+<script src="report_files/libs/quarto-html/popper.min.js"></script>
+<script src="report_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="report_files/libs/quarto-html/anchor.min.js"></script>
+<link href="report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="report_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#description-of-the-data" id="toc-description-of-the-data" class="nav-link" data-scroll-target="#description-of-the-data">Description of the data</a></li>
+  <li><a href="#quantifying-cold-and-long-winters" id="toc-quantifying-cold-and-long-winters" class="nav-link" data-scroll-target="#quantifying-cold-and-long-winters">Quantifying cold and long winters</a></li>
+  <li><a href="#estimating-total-energy-needs-left-on-a-given-day" id="toc-estimating-total-energy-needs-left-on-a-given-day" class="nav-link" data-scroll-target="#estimating-total-energy-needs-left-on-a-given-day">Estimating total energy needs left on a given day</a></li>
+  <li><a href="#figuring-in-actual-energy-usage" id="toc-figuring-in-actual-energy-usage" class="nav-link" data-scroll-target="#figuring-in-actual-energy-usage">Figuring in actual energy usage</a>
+  <ul class="collapse">
+  <li><a href="#first-approximation-based-on-data-from-a-given-season" id="toc-first-approximation-based-on-data-from-a-given-season" class="nav-link" data-scroll-target="#first-approximation-based-on-data-from-a-given-season">First approximation based on data from a given season</a></li>
+  <li><a href="#second-approximation---using-data-from-previous-years" id="toc-second-approximation---using-data-from-previous-years" class="nav-link" data-scroll-target="#second-approximation---using-data-from-previous-years">Second approximation - using data from previous years</a></li>
+  </ul></li>
+  <li><a href="#remarks" id="toc-remarks" class="nav-link" data-scroll-target="#remarks">Remarks</a>
+  <ul class="collapse">
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  </ul></li>
+  </ul>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="report.docx"><i class="bi bi-file-word"></i>MS Word</a></li></ul></div></nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Heating needs</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Márton Kiss, MD </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Error in integrate(f, subdivisions = 1e+05, rel.tol = 0.1, lower = xmin,  : 
+  a limit is NA or NaN</code></pre>
+</div>
+</div>
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>&nbsp;&nbsp;</p>
+<p>In this document I’m describing a possible method for estimating the expected amount of energy required for heating left for a given year (or season as my billing cycle starts annually on August 1st, during the local summer).</p>
+<p>I was motivated by my local billing method which has a huge discount for natural gas but only up to a given amount. I can supplement my heating with air conditioning, but that is more expensive than the discounted gas (but not more expensive than the full-priced gas). The efficiency of the air conditioning is also impacted by the outside temperature, COP (amount of heating / amount of electricity used) being higher when the outside temperature is higher.</p>
+<p>Bottom line is, I’d like to use a given amount of natural gas for heating per year, and to top off the remaining heat requirements with air conditioning, preferably during autumn &amp; spring.</p>
+<p>For better or worse I feel that a considerable amount of my professional pride rests in tracking &amp; determining the optimal method of heating.</p>
+</section>
+<section id="description-of-the-data" class="level1">
+<h1>Description of the data</h1>
+<p>&nbsp;<br>
+Meteorological data from 1995 onward is available for free at <a href="https://meteostat.net/en/place/hu/budapest-xix-kerulet?s=12843&amp;t=2024-01-03/2024-01-10">meteostat</a> for my location in Budapest, Hungary (Europe) in excel. I haven’t figured out the API, and I am downloading a new excel periodically and concatenating them in R.</p>
+<p>I have also read my gas meter regularly from 2018 onwards. To make it interesting, I don’t read the meter regularly, so the times between readings are between 2.4 hours and 163 days so the quality of the observations are not ideal.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid" width="384"></p>
+</div>
+</div>
+<div style="page-break-after: always;"></div>
+</section>
+<section id="quantifying-cold-and-long-winters" class="level1">
+<h1>Quantifying cold and long winters</h1>
+<p>The amount of energy required for heating is the function of the outside temperature.</p>
+<p>Therefore to predict the energy needs left in a given (heating) season, we should make a prediction about the expected amount of energy required until the end of the season.</p>
+<p>Thankfully things seem to be straightforward if we assume that the inside temperature of the building should be constant (it’s not but bear with me). Assume 20°C (68°F). Heat loss is linear to the difference in temperature between the inside and outside temperatures <a href="http://hyperphysics.phy-astr.gsu.edu/hbase/thermo/heatloss.html">link</a>.</p>
+<p>Therefore when the outside temperature is 16°C we would need 4x the power to heat the building than if it would be 19°C. Also, this amount of energy needed for these two days is the same that we would need for heating for 3 days if it were <span class="math inline">\(20 - 5/3 = 18.33\)</span> degrees outside. In other words for a given heating season, we would add up the “missing degrees” until 20 for every day the outside temperature was less than 20°.</p>
+<p>We have a pesky issue with missing data (sometimes every 2nd or 3rd date has results in the 90’s). The below step is quite rudimentary, doing linear interpolation between existing datapoints. This would capture the high autocorrelation between dates but it ain’t perfect.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>I personally like this approach very much, but of course we are neglecting:</p>
+<ul>
+<li>The effects of solar radiation, eg. sunlight heats up the building a bit,</li>
+<li>the building’s heat capacity, eg. after a hot summer’s day, it takes about 3 days for the walls to cool</li>
+</ul>
+<p>For simplicity and to retain my sanity, lets also assume that at each timepoint (day), the distribution of ‘energy needs’ is normal.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The evolution of the energy needs <em>may</em> be thought of as logistic growth but I’m not exploring that at this time.</p>
+</div>
+</div>
+<p>I’d like to fit a <em>linear model</em> for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I’d opt for a <em>generalized least squares</em> model with an <em>exponential variance structure</em> (meaning that the residuals are understood to have a larger variance when more days have elapsed). Its not perfect, since at the end of the season (june, july) not much heating is going on and therefore variance tends to taper off there.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-14-2.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>I could not, for the life of me got the <em>prediction intervals</em> correctly out of the model which would expand over the course of the elapsed days. One potential solution would be the package <em>AICcmodavg</em> but it threw an error (possibly because I used <em>tibbles</em> for my data; solution is trivial, but not going to implement it).</p>
+<p>As a “petty craftsman” kind of approach, I calculated standard deviations for all days and then fitted a <em>linear model</em> over it with a natural spline term capturing the evolution of standard deviation in heating needs over the course of a season.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Now we have a mean and a variance for the cumulative heating energy needs on any given day (at my location)! I can then assign a z-score for each result through the years.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</section>
+<section id="estimating-total-energy-needs-left-on-a-given-day" class="level1">
+<h1>Estimating total energy needs left on a given day</h1>
+<p>This is all well and good, and this translates to an estimated total energy need at the beginning of a season, but we are mainly interested in the <em>conditional</em> energy need for the total season if we have observed the cumulative energy need up to day “<em>d”.</em></p>
+<p>I start with investigating how do energy need values observed on a given day <em>correlate</em> to the <em>total</em> energy need for a given season. Specifically, what was the correlation between the z-scores of a given day vs.&nbsp;the last day in a season.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The spike around day 150 is due to leap years (probably); didn’t bother to fix it, as it didn’t bother the results much. I fit a linear model with a spline for this relationship, like before.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Sooo…. we are searching for the <em>Y</em> normal distribution, which is correlated by <em>c</em> with the normal distribution <em>X</em>, then</p>
+<p><span class="math inline">\(mean(Y)|(X=x) = c * x\)</span></p>
+<p><span class="math inline">\(variance(Y)|(X=x) = (1 - c^2)*variance(Y)\)</span></p>
+<p>Lets fix day n the season as <em>173</em> and the cumulated energy need thus far as <em>1530</em> (beginning of January, 2024). I’m not a 100% that I’ve implemented the intermediate values the right way, but I am sure about the end state (at Day 365). Level of significance is at 5% (hence the 1.96x SD part).</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>I can therefore construct an interval estimate of how much energy I still need to burn in this heating season (how much ‘coldness’ there will be before summer). I prefer to see the realized energy need as a percentage of what can be expected in total.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.4749717</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0.5681479</code></pre>
+</div>
+</div>
+<p>It seems that up until this point we have experienced 47-57% of our total energy need for heating this season.</p>
+</section>
+<section id="figuring-in-actual-energy-usage" class="level1">
+<h1>Figuring in actual energy usage</h1>
+<section id="first-approximation-based-on-data-from-a-given-season" class="level2">
+<h2 class="anchored" data-anchor-id="first-approximation-based-on-data-from-a-given-season">First approximation based on data from a given season</h2>
+<p>I have everything I need to make predictions about the expected total amount of <em>gas</em> I need for the rest of the year. For each day, I make an interval prediction for the total energy requirement for the year, I calculate the remaining portion of this need, and I estimate the amount of gas I need for this portion, given that I used up <em>V</em> amount of gas for <em>Q</em> amount of heating.</p>
+<p>The method isn’t perfect. I seem to get reliable estimates around 1 month into winter. There are multiple potential reasons: - The house has a ton of heat capacity, and I don’t actually need to heat it if the mean temperature drops to ~19° for a day or two. This makes the realized ‘energy needs’ conservative in the autumn/spring. - I use the heat pump for heating sometimes when the temperature difference isn’t huge (and therefore the heat pump is crazy efficient). This inflates the estimated energy needs further when the temperature difference is low (autumn/summer).</p>
+<p>The resulting estimates are quite cool though.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The width of the confidence interval is decreasing after a point too, I hope it reaches ‘0’ when the year is done.</p>
+</section>
+<section id="second-approximation---using-data-from-previous-years" class="level2">
+<h2 class="anchored" data-anchor-id="second-approximation---using-data-from-previous-years">Second approximation - using data from previous years</h2>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="report_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div style="page-break-after: always;"></div>
+</section>
+</section>
+<section id="remarks" class="level1">
+<h1>Remarks</h1>
+<section id="md5-checksum-of-the-database-used" class="level3">
+<h3 class="anchored" data-anchor-id="md5-checksum-of-the-database-used">MD5 checksum of the database used</h3>
+</section>
+<section id="other-information-regarding-the-documents-compilation" class="level3">
+<h3 class="anchored" data-anchor-id="other-information-regarding-the-documents-compilation">Other information regarding the document’s compilation</h3>
+<p>Analyses were conducted using the R Statistical language (version 4.3.1; R Core Team, 2023) on Windows 10 x64 (build 19045), using the packages lubridate (version 1.9.3; Grolemund G, Wickham H, 2011), here (version 1.0.1; Müller K, 2020), nlme (version 3.1.164; Pinheiro J et al., 2023), ggplot2 (version 3.5.0; Wickham H, 2016), readxl (version 1.4.3; Wickham H, Bryan J, 2023) and dplyr (version 1.1.4; Wickham H et al., 2023).</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Grolemund G, Wickham H (2011). “Dates and Times Made Easy with lubridate.” <em>Journal of Statistical Software</em>, <em>40</em>(3), 1-25. <a href="https://www.jstatsoft.org/v40/i03/" class="uri">https://www.jstatsoft.org/v40/i03/</a>.</li>
+<li>Müller K (2020). <em>here: A Simpler Way to Find Your Files</em>. R package version 1.0.1, <a href="https://CRAN.R-project.org/package=here" class="uri">https://CRAN.R-project.org/package=here</a>.</li>
+<li>Pinheiro J, Bates D, R Core Team (2023). <em>nlme: Linear and Nonlinear Mixed Effects Models</em>. R package version 3.1-164, <a href="https://CRAN.R-project.org/package=nlme" class="uri">https://CRAN.R-project.org/package=nlme</a>. Pinheiro JC, Bates DM (2000). <em>Mixed-Effects Models in S and S-PLUS</em>. Springer, New York. doi:10.1007/b98882 <a href="https://doi.org/10.1007/b98882" class="uri">https://doi.org/10.1007/b98882</a>.</li>
+<li>R Core Team (2023). <em>R: A Language and Environment for Statistical Computing</em>. R Foundation for Statistical Computing, Vienna, Austria. <a href="https://www.R-project.org/" class="uri">https://www.R-project.org/</a>.</li>
+<li>Wickham H (2016). <em>ggplot2: Elegant Graphics for Data Analysis</em>. Springer-Verlag New York. ISBN 978-3-319-24277-4, <a href="https://ggplot2.tidyverse.org" class="uri">https://ggplot2.tidyverse.org</a>.</li>
+<li>Wickham H, Bryan J (2023). <em>readxl: Read Excel Files</em>. R package version 1.4.3, <a href="https://CRAN.R-project.org/package=readxl" class="uri">https://CRAN.R-project.org/package=readxl</a>.</li>
+<li>Wickham H, François R, Henry L, Müller K, Vaughan D (2023). <em>dplyr: A Grammar of Data Manipulation</em>. R package version 1.1.4, <a href="https://CRAN.R-project.org/package=dplyr" class="uri">https://CRAN.R-project.org/package=dplyr</a>.</li>
+</ul>
+<section id="time-of-compilation" class="level3">
+<h3 class="anchored" data-anchor-id="time-of-compilation">Time of compilation</h3>
+<p>2024-05-01 12:56:39.970234</p>
+</section>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

@@ -1,5 +1,8 @@
 library(dplyr)
 library(ggplot2)
+library(lubridate)
+library(nlme)
+library(splines)
 
 source_all_files <- function(directory) {
   file_paths <- list.files(directory, pattern = "\\.[rR]$", full.names = TRUE)
@@ -11,9 +14,9 @@ source_all_files <- function(directory) {
 
 source_all_files(here::here("R"))
 
-merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
-                         gaz_dir  = "inst/extdata/gaz.xlsx",
-                         output_file = "data/meteostat_data.Rdata")
+# merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
+#                          gaz_dir  = "inst/extdata/gaz.xlsx",
+#                          output_file = "data/meteostat_data.Rdata")
 
 load( here::here("data","meteostat_data.Rdata")) 
 load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow suff's output

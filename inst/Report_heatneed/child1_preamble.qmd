@@ -1,0 +1,37 @@
+---
+title: ""
+format: docx
+editor: visual
+---
+
+# Introduction
+
+  
+
+In this document I'm describing a possible method for estimating the expected amount of energy required for heating left for a given year (or season as my billing cycle starts annually on August 1st, during the local summer).
+
+I was motivated by my local billing method which has a huge discount for natural gas but only up to a given amount. I can supplement my heating with air conditioning, but that is more expensive than the discounted gas (but not more expensive than the full-priced gas). The efficiency of the air conditioning is also impacted by the outside temperature, COP (amount of heating / amount of electricity used) being higher when the outside temperature is higher.
+
+Bottom line is, I'd like to use a given amount of natural gas for heating per year, and to top off the remaining heat requirements with air conditioning, preferably during autumn & spring.
+
+For better or worse I feel that a considerable amount of my professional pride rests in tracking & determining the optimal method of heating.
+
+# Description of the data
+
+ \
+Meteorological data from 1995 onward is available for free at [meteostat](https://meteostat.net/en/place/hu/budapest-xix-kerulet?s=12843&t=2024-01-03/2024-01-10) for my location in Budapest, Hungary (Europe) in excel. I haven't figured out the API, and I am downloading a new excel periodically and concatenating them in R.
+
+I have also read my gas meter regularly from 2018 onwards. To make it interesting, I don't read the meter regularly, so the times between readings are between `r round(min(obs_readings$Day)*24,digits=1)` hours and `r round(max(obs_readings$Day),digits=0)` days so the quality of the observations are not ideal.
+
+```{r, fig.height=3, fig.width=4}
+obs_readings %>%
+  ggplot(aes(x=as_date(Date),y=Day)) +
+    theme_bw() +
+    geom_point() +
+    scale_x_date(date_breaks = "6 months",date_labels = "%y.%m") +
+    labs(x = "Date of the obervation (yy.mm)",
+         y = "Observed period (days)")
+
+```
+
+

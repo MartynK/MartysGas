@@ -72,14 +72,14 @@ simulate_weather <- function(n = 365,
   return(pr)  
 }
 
-load(here::here("inst","function","backend","mod_tavg.Rdata"))
-load(here::here("inst","function","backend","mod_range.Rdata"))
-
-coefs <- list(
-  tavg_acf = coef(mod_tavg$modelStruct$corStruct, 
-                  unconstrained = FALSE),
-  tavg_sigma = summary(mod_tavg)$sigma,
-  range_acf = coef(mod_range$modelStruct$corStruct, 
-                   unconstrained = FALSE),
-  range_sigma = summary(mod_range)$sigma  
-)
+# load(here::here("inst","function","backend","mod_tavg.Rdata"))
+# load(here::here("inst","function","backend","mod_range.Rdata"))
+# 
+# coefs <- list(
+#   tavg_acf = coef(mod_tavg$modelStruct$corStruct, 
+#                   unconstrained = FALSE),
+#   tavg_sigma = summary(mod_tavg)$sigma,
+#   range_acf = coef(mod_range$modelStruct$corStruct, 
+#                    unconstrained = FALSE),
+#   range_sigma = summary(mod_range)$sigma  
+# )
