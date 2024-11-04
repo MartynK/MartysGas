@@ -4,6 +4,14 @@ library(splines)
 source( here::here( "inst", "function", "load_stuff.r"))
 
 act_year <- 2024
+# which is current 'ywint'?
+act_ywint <- obs_days %>%
+  ungroup() %>%
+  mutate(ywint = as.numeric(ywint)) %>%
+  filter( year(Date) == act_year) %>%
+  mutate(ywint = max(ywint)) %>%
+  slice(1) %>%
+  pull(ywint)
 
 get_approx_meter <-  approxfun(obs_readings$Date,
                                obs_readings$Value_trf, 
@@ -35,10 +43,6 @@ obs_days <- obs_days %>%
           Spent_perc = ifelse( year(Date) == act_year,
                                Spent / 1730,
                                Spent / max(Spent, na.rm = TRUE)))
-
-
-
-
 
 # Create a complete date sequence
 complete_dates <- 
@@ -95,9 +99,10 @@ close(pb)
 
 # back transforming to factor
 obs_days_complete <- obs_days_complete %>%
-  mutate(ywint = as.factor( ywint)) %>%
-  group_by(ywint) %>%
-  mutate( tavg_low_cum_ratio = tavg_low_cumul / max(tavg_low_cumul, na.rm = TRUE))
+  # # filter current year whose outcome is yet unknown
+  # filter(ywint != act_ywint) %>%
+  mutate(ywint = as.factor( ywint)) 
+
 
 # didnt observe the first year from the start,results not correct
 obs_days_complete$tavg_low_cumul[obs_days_complete$ywint==1] <- NA 
@@ -110,19 +115,141 @@ obs_days_complete$tavg_low_cumul[obs_days_complete$day_in_wint %% 1 != 0] <- NA
 obs_days_complete <- obs_days_complete %>% filter(is.na(tavg_low_cumul) == FALSE)
 
 
+obs_days_complete <- obs_days_complete %>%
+  group_by(ywint) %>%
+  mutate( tavg_low_cum_ratio = tavg_low_cumul / 
+                                 max(tavg_low_cumul, na.rm = TRUE),
+           tavgl_left = max(tavg_low_cumul, na.rm = TRUE) - tavg_low_cumul) %>%
+  ungroup()
+
+tavgcum_exp_sd <- obs_days_complete %>%
+  group_by(ywint) %>%
+  filter( day_in_year == max(day_in_year) ) %>%
+  .$tavg_low_cumul %>%
+  sd(na.rm = TRUE)
+
+tavgcum_exp <- obs_days_complete %>%
+  group_by(ywint) %>%
+  filter( day_in_year == max(day_in_year) ) %>%
+  .$tavg_low_cumul %>%
+  mean(na.rm = TRUE)
+  
+# now calculate the correlationss per day with the final figure; doesnt work inline for some reason
+cors <- rep(NA, 366)
+sds <- rep(NA, 366)
+for (i in 1:364) {
+  x <- obs_days_complete %>%
+    ungroup() %>%
+    filter(day_in_wint == i,
+           ywint != act_ywint ) %>%
+    select(tavgl_left, ywint)
+  
+  y <- obs_days_complete %>%
+    group_by(ywint) %>%
+    filter(ywint != act_ywint ) %>%
+    filter(day_in_wint == max(day_in_wint)) %>%
+    select(tavg_low_cumul, ywint)
+  
+  mat <- left_join(x, y, by = "ywint") %>%
+    select(-ywint) %>%
+    as.matrix()
+  
+  cors[i] <- cor(mat, use = "pairwise.complete.obs")[1,2]
+  sds[i]  <- sd(mat[,1])
+  
+}
+
+obs_days_complete <- obs_days_complete %>%
+  rowwise() %>%
+  mutate( tavgcum_cor = cors[round(day_in_wint)+1],
+          tavgcum_sd  = sds[round(day_in_wint)+1])
 
 
-fig_heatneed_per_year <- 
-  obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, 
-             y = tavg_low_cum_ratio
+mod_tavg_low_cum_mean <- lm( tavgl_left ~ ns(day_in_wint, df = 5), 
+                                   obs_days_complete)
+
+# check model
+mod_tavg_low_cum_mean %>% 
+  effects::predictorEffects(partial.residuals = TRUE) %>% 
+  plot
+
+mod_tavg_low_cum_sd <- lm( tavgcum_sd ~ ns(day_in_wint, df = 11), 
+                            obs_days_complete)
+
+# check model
+mod_tavg_low_cum_sd %>% 
+  effects::predictorEffects(partial.residuals = TRUE) %>% 
+  plot
+
+# predictions go into new cols in the dataframe
+obs_days_complete$tavgl_left_pred     <- predict(mod_tavg_low_cum_mean, 
+                                             newdata = obs_days_complete)
+obs_days_complete$tavgl_left_pred_sd  <- predict(mod_tavg_low_cum_sd, 
+                                                 newdata = obs_days_complete)
+
+
+# based on the predictions give a predicted 95%CI
+obs_days_complete <- obs_days_complete %>%
+  ungroup() %>%
+  mutate( tavgcum_pred_lwr = tavgl_left_pred - 1.96 * tavgl_left_pred_sd,
+          tavgcum_pred_upr = tavgl_left_pred + 1.96 * tavgl_left_pred_sd,
+          spent_tavg = Spent / tavg_low_cumul,
+          gas_left = 1730 - 0.4*(365 - day_in_wint) - Spent,
+          tavgcum_left = tavgcum_total_pred - tavg_low_cumul,
+          spent_tavg_left_mean = gas_left/ (tavgl_left_pred ),
+          spent_tavg_left_upr = gas_left / (tavgcum_pred_upr),
+          spent_tavg_left_lwr = gas_left / (tavgcum_pred_lwr)
+          )
+
+obs_days_complete %>%
+  filter(as.numeric(ywint) > 25) %>%
+  ggplot(aes(x = day_in_wint,
+             y = spent_tavg,
+             group = ywint,
+             color = ywint
   )) +
   theme_bw() +
-  geom_line(alpha=.7, mapping = aes(
-    color = year
-    #,fill=year
-    ,group = factor(ywint))) +
-  labs( x = "Day in the season (starts Aug.1st)",
-        y = "'Missing degrees until 20' x Days ")
+  geom_line(linewidth=1.5) +
+  scale_y_continuous(limits = c(-.1, 2))
+
+# start of the heating season
+ywint_lim <- 31
+
+date_limits <-
+  obs_days_complete %>%
+  filter(ywint == ywint_lim) %>%
+  arrange(day_in_wint) %>%
+  .[60, ] %>%
+  pull(Date) %>%
+  year() %>%
+  paste0(.,"-08-01") %>%
+  as.POSIXct() %>%
+  rep(.-1, 2)
+date_limits[2] <- date_limits[2] + 365*24*3600
+
+
+obs_days_complete %>%
+  filter(ywint == ywint_lim) %>%
+  ggplot(aes(x = Date,
+             y = spent_tavg,
+             color = gas_left
+  )) +
+  theme_bw() +
+  # color scale until 0
+  scale_color_gradient(high = "blue", low = "green"
+                       , limits = c(0,1730)
+                       ) +
+  geom_line(linewidth=1.5) +
+  geom_line(aes(y = spent_tavg_left_mean), color = "grey50", 
+            linetype="dashed", linewidth = 1.2) +
+  geom_line(aes(y =  spent_tavg_left_lwr), color = "grey70", 
+            linetype="dashed", linewidth = 1.2) +
+  geom_line(aes(y = spent_tavg_left_upr), color = "grey70", 
+            linetype="dashed", linewidth = 1.2) +
+  scale_y_continuous(limits = c(0, 1)) +
+  # date scale (posixct) 1 year
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%b",
+                   limits = date_limits) +
+  labs( x = "", y = "Average gas consumption m3/°C")
 
 
