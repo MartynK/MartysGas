@@ -195,11 +195,36 @@ obs_days_complete <- obs_days_complete %>%
           tavgcum_pred_upr = tavgl_left_pred + 1.96 * tavgl_left_pred_sd,
           spent_tavg = Spent / tavg_low_cumul,
           gas_left = 1730 - 0.4*(365 - day_in_wint) - Spent,
-          tavgcum_left = tavgcum_total_pred - tavg_low_cumul,
+          #tavgcum_left = tavgcum_total_pred - tavg_low_cumul,
           spent_tavg_left_mean = gas_left/ (tavgl_left_pred ),
           spent_tavg_left_upr = gas_left / (tavgcum_pred_upr),
           spent_tavg_left_lwr = gas_left / (tavgcum_pred_lwr)
           )
+
+# give january 5 alternative deadline specific line
+jan_gasvals <- obs_days_complete %>%
+  filter(day_in_wint == 157) %>%
+  select(Meter,Spent,Date)
+
+# Get the m3 remaining if jan 5 was the deadline (<10sec)
+obs_days_complete$gas_left_jan <- NA
+for (i in 1:nrow(obs_days_complete)) {
+  act_yr <- year(obs_days_complete$Date[i])
+  act_last_meter <- jan_gasvals$Meter[act_yr == year(jan_gasvals$Date)]
+  # If not in first year where no prev. values are present
+  if (length(act_last_meter) == 1) {
+    obs_days_complete$gas_left_jan[i] <- 1730 - obs_days_complete$Meter[i] + 
+      act_last_meter
+  }
+}
+# Calculate the suggested rate of burn
+obs_days_complete <- obs_days_complete %>%
+  mutate( tavgl_left_jan = predict(mod_tavg_low_cum_mean, 
+                                   newdata = data.frame(day_in_wint = 157)) -
+                            tavg_low_cumul,
+          spent_tavg_left_jan = gas_left_jan / (tavgl_left_jan),
+          ) 
+
 
 obs_days_complete %>%
   filter(as.numeric(ywint) > 25) %>%
@@ -246,6 +271,8 @@ obs_days_complete %>%
             linetype="dashed", linewidth = 1.2) +
   geom_line(aes(y = spent_tavg_left_upr), color = "grey70", 
             linetype="dashed", linewidth = 1.2) +
+  geom_line(aes(y = spent_tavg_left_jan), color = "salmon4", 
+            linetype="solid", linewidth = 1.2) +
   scale_y_continuous(limits = c(0, 1)) +
   # date scale (posixct) 1 year
   scale_x_datetime(date_breaks = "1 month", date_labels = "%b",

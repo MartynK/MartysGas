@@ -23,7 +23,13 @@
 #' merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
 #'                          output_file = "data/meteostat_data.Rdata")
 merge_transform_weather <- function(data_dir, gaz_dir, output_file,
-                                    act_year = 2023) {
+                                    act_year = 2024) {
+  
+  # Load required libraries
+  library(dplyr)
+  library(readxl)
+  library(lubridate)
+  library(here)
 
   get_avg_temp <- function( df = obs_days, var = "tavg", var_time = "Date",
                             xmin, xmax) {
@@ -39,13 +45,6 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     duration <- difftime( xmax, xmin, units = "secs")
     return( integrated / as.numeric(duration))
   }
-  
-  
-  # Load required libraries
-  library(dplyr)
-  library(readxl)
-  library(lubridate)
-  library(here)
   
   # List all files in the data directory
   fil <- here::here(data_dir) %>% list.files
@@ -122,6 +121,9 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     ) %>%
     filter(Day!=0) 
   
+  # extract last date to truncate result
+  last_reading <- obs_readings %>% slice_tail(n=1) %>% pull(Date)
+  
   obs_readings$Value_trf <- 0
   for (i in 1:nrow(obs_readings)) {
     if (i == 1) {
@@ -153,7 +155,9 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     mutate( Spent = Meter - min(Meter, na.rm = TRUE),
             Spent_perc = ifelse( year(Date) == act_year,
                                  Spent / 1730,
-                                 Spent / max(Spent, na.rm = TRUE)))
+                                 Spent / max(Spent, na.rm = TRUE))) %>%
+    # crop data after last reading
+    filter( Date < last_reading)
     
   
   # this took about 3 min with a for loop :)
@@ -173,7 +177,9 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     mutate( Spent = Meter - min(Meter, na.rm = TRUE),
             Spent_perc = ifelse( year(Date) == act_year,
                                  Spent / 1730,
-                                 Spent / max(Spent, na.rm = TRUE)))
+                                 Spent / max(Spent, na.rm = TRUE))) %>%
+    # crop data after last reading
+    filter( Date < last_reading)
   
   obs_readings <- obs_readings %>%
     rowwise() %>%
@@ -192,7 +198,7 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
 }
 
 
-# 
+
 # merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
 #                          gaz_dir  = "inst/extdata/gaz.xlsx",
 #                          output_file = "data/meteostat_data.Rdata")
