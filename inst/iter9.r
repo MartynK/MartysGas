@@ -3,8 +3,13 @@ library(splines)
 
 source( here::here( "inst", "function", "load_stuff.r"))
 
+merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
+                         gaz_dir  = "inst/extdata/gaz.xlsx",
+                         output_file = "data/meteostat_data.Rdata")
+
+
 act_year <- 2024
-# which is current 'ywint'?
+# which is current 'ywint'
 act_ywint <- obs_days %>%
   ungroup() %>%
   mutate(ywint = as.numeric(ywint)) %>%
@@ -191,6 +196,7 @@ obs_days_complete$tavgl_left_pred_sd  <- predict(mod_tavg_low_cum_sd,
 # based on the predictions give a predicted 95%CI
 obs_days_complete <- obs_days_complete %>%
   ungroup() %>%
+  #rowwise() %>%
   mutate( tavgcum_pred_lwr = tavgl_left_pred - 1.96 * tavgl_left_pred_sd,
           tavgcum_pred_upr = tavgl_left_pred + 1.96 * tavgl_left_pred_sd,
           spent_tavg = Spent / tavg_low_cumul,
