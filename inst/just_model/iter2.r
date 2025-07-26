@@ -1,10 +1,5 @@
+source(here::here("inst","function","load_stuff.r"))
 # Load packages
-library(dplyr)
-library(lubridate)
-library(splines)
-library(splines2)
-library(ggplot2)
-library(nlme)
 
 # load the data
 load(here::here("inst","just_model","iter1.rdata"))

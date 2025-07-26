@@ -1,13 +1,7 @@
+source(here::here("inst","function","load_stuff.r"))
 # Some calculations of medium sophistication for the planning on the heating season of 2022/23
 # Price of gas is discounted up to 1730 m3/year, so thats our incentive...
 
-library(readxl)
-library(readr)
-library(dplyr)
-library(splines)
-library(lubridate)
-library(ggplot2)
-library(nlme)
 
 gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
 colnames(gaz) <- c("date", "day_in_year_good", "nextdate", "rate")

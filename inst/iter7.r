@@ -1,3 +1,4 @@
+source(here::here("inst","function","load_stuff.r"))
 
 
 source( here::here( "inst", "function", "load_stuff.r"))
@@ -60,7 +61,6 @@ pr %>%
 
 #####
 #ACF intermezzo
-library(nlme)
 
 mod_days_gls <- gls( Rate ~ I(tavg - 20) * ywint, 
                      correlation = corAR1(form = ~ day_dataframe),

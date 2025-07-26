@@ -1,10 +1,6 @@
+source(here::here("inst","function","load_stuff.r"))
 # Trying to simulate weather and learning about quantile regression in the meantime
 
-library(forecast)
-library(splines)
-library(dplyr)
-library(nlme)
-library(ggplot2)
 
 load( here::here( "inst", "iter6_mods.rdata"))
 
@@ -117,7 +113,6 @@ data %>%
   geom_smooth(mapping = aes( x = day_in_year, y = tavg, group = NULL))
 
 # És amit kerestem idáig...
-library(quantreg)
 
 qr_modf <- rq( tavg ~ ns( day_in_year, df = 4), 
              data = data, 

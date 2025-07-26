@@ -1,7 +1,6 @@
+source(here::here("inst","function","load_stuff.r"))
 # These are some good old fashioned analyses based on the available transformed data
 
-library(splines)
-library(ggplot2)
 
 source( here::here( "data_transforms.r"))
 

@@ -1,14 +1,10 @@
+source(here::here("inst","function","load_stuff.r"))
 # Trying to simulate weather and learning about quantile regression in the meantime
 # DEPENDSON: "make_weather_csv.r"
 
 
 here::here( "make_weather_csv.r") %>% source
 
-library(forecast)
-library(splines)
-library(dplyr)
-library(nlme)
-library(ggplot2)
 
 
 dayinyr_to_dayinwint <- function(d) {
@@ -103,7 +99,6 @@ data %>%
   geom_smooth(mapping = aes( x = day_in_year, y = tavg, group = NULL))
 
 # És amit kerestem idáig...
-library(quantreg)
 
 qr_90 <- rq( tavg ~ ns( day_in_year, df = 4), 
              data = data, 

@@ -1,9 +1,4 @@
-library(readxl)
-library(readr)
-library(dplyr)
-library(lubridate)
-library(nlme)
-library(splines)
+source(here::here("inst","function","load_stuff.r"))
 
 #setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
 

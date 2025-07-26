@@ -1,9 +1,4 @@
-library(dplyr)
-library(lubridate)
-library(splines)
-library(splines2)
-library(ggplot2)
-library(nlme)
+source(here::here("inst","function","load_stuff.r"))
 
 load( here::here("data","meteostat_data.Rdata")) 
 #load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow suff's output

@@ -1,8 +1,14 @@
-library(dplyr)
-library(ggplot2)
-library(lubridate)
-library(nlme)
-library(splines)
+pkgs <- c(
+  "dplyr", "ggplot2", "lubridate", "nlme", "splines",
+  "readxl", "readr", "ggpubr", "forecast", "quantreg",
+  "lme4", "boot", "splines2", "here"
+)
+
+invisible(lapply(pkgs, function(p) {
+  suppressPackageStartupMessages(
+    library(p, character.only = TRUE)
+  )
+}))
 
 source_all_files <- function(directory) {
   file_paths <- list.files(directory, pattern = "\\.[rR]$", full.names = TRUE)
