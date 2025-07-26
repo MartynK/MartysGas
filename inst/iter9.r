@@ -1,7 +1,5 @@
-library(nlme)
-library(splines)
+source(here::here("inst","function","load_stuff.r"))
 
-source( here::here( "inst", "function", "load_stuff.r"))
 
 merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
                          gaz_dir  = "inst/extdata/gaz.xlsx",
