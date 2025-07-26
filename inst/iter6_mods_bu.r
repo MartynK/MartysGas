@@ -1,7 +1,14 @@
+
+# ------------------------------------------------------------
+# * Backup of early heating season analysis
+# * Builds GAM curves for temperature vs usage
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
 # These are some good old fashioned analyses based on the available transformed data
 
-library(splines)
-library(ggplot2)
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+
 
 source( here::here( "data_transforms.r"))
 

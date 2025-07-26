@@ -1,8 +1,16 @@
+
+# ------------------------------------------------------------
+# * Analyze heating season after transformations
+# * Estimate gas usage and daily temps
+# * Derive winter curves and predictions
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
 # These are some good old fashioned analyses based on the available transformed data
 # DEPENDSON: data_transforms.r
 
-library(splines)
-library(ggplot2)
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+
 
 
 USED_UP <-  last(

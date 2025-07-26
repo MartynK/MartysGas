@@ -1,14 +1,18 @@
-# Trying to simulate weather and learning about quantile regression in the meantime
+
+# ------------------------------------------------------------
+# * Weather simulation experiments
+# * Quantile regression for temperature extremes
+# * Uses helper script `make_weather_csv.r`
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
 # DEPENDSON: "make_weather_csv.r"
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
 
 
 here::here( "make_weather_csv.r") %>% source
 
-library(forecast)
-library(splines)
-library(dplyr)
-library(nlme)
-library(ggplot2)
 
 
 dayinyr_to_dayinwint <- function(d) {
@@ -67,7 +71,7 @@ simulate_year <- function( n = 365,
 
 # Check the autocorrelation of the simulated data
 acf(simulate_year())
-plot(simulate_year(), type = 'l')
+fig_sim_year <- capture_plot(plot(simulate_year(), type = 'l'))
 
 
 pr <- expand.grid( 
@@ -103,14 +107,13 @@ data %>%
   geom_smooth(mapping = aes( x = day_in_year, y = tavg, group = NULL))
 
 # És amit kerestem idáig...
-library(quantreg)
 
 qr_90 <- rq( tavg ~ ns( day_in_year, df = 4), 
              data = data, 
              tau = c(.05,.95))
 
 summary(qr_90)
-plot(qr_90$fitted.values)
+fig_qr_fit <- capture_plot(plot(qr_90$fitted.values))
 
 pr$pred_q05 <- predict(qr_90, newdata = pr)[,1]
 pr$pred_q95 <- predict(qr_90, newdata = pr)[,2]

@@ -1,10 +1,11 @@
-# Load packages
-library(dplyr)
-library(lubridate)
-library(splines)
-library(splines2)
-library(ggplot2)
-library(nlme)
+
+# ------------------------------------------------------------
+# * Experiment with tropical year parameterization
+# * Builds linear mixed models for temperature prediction
+# * Saves intermediate results for subsequent iterations
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
 
 # Load 'meteostat_weather' & 'obs_day' data
 load( here::here("data","meteostat_data.Rdata")) 

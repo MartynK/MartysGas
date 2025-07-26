@@ -1,7 +1,14 @@
-library(nlme)
-library(splines)
 
-source( here::here( "inst", "function", "load_stuff.r"))
+# ------------------------------------------------------------
+# * Full pipeline wrapper script
+# * Cleans weather and gas files
+# * Computes cumulative heating need for current year
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+
 
 merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
                          gaz_dir  = "inst/extdata/gaz.xlsx",

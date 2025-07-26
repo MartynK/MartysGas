@@ -1,4 +1,7 @@
 
+# ------------------------------------------------------------
+# * Further experiments predicting using cross-validation
+# ------------------------------------------------------------
 dividers = seq.Date(from = {min(dat$Date)+days(365*3)} %>% 
                       as.Date() %>% 
                       `month<-`(8) %>% 

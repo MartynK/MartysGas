@@ -1,9 +1,14 @@
-library(readxl)
-library(readr)
-library(dplyr)
-library(lubridate)
-library(nlme)
-library(splines)
+
+# ------------------------------------------------------------
+# * Approximate hourly temperature from daily data
+# * Join gas meter readings with temperature data
+# * Fit a simple model to explain hourly gas rate
+# * Compare model predictions across years
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
 
 #setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
 
@@ -43,9 +48,11 @@ gaz_rendetlen$dtmn <- (gaz_rendetlen$dtmn / 3600 /24 -17873) %>% round(digits=2)
 
 #View(gaz_rendetlen)
 
-plot(temps_xtra$splined_temp,type="l")
+fig_spline_temp <- capture_plot(plot(temps_xtra$splined_temp, type = "l"))
 
-plot(gaz_rendetlen$tsum, gaz_rendetlen$Rate)
+fig_gasrate_scatter <- capture_plot(
+  plot(gaz_rendetlen$tsum, gaz_rendetlen$Rate)
+)
 
 mod <- lm( Rate ~ 
            (
@@ -57,7 +64,9 @@ mod <- lm( Rate ~
            , 
            gaz_rendetlen)
 
-mod %>% effects::predictorEffects( residuals = TRUE) %>% plot()
+fig_model_effects <- capture_plot(
+  mod %>% effects::predictorEffects(residuals = TRUE) %>% plot()
+)
 # 
 # summary(gaz_rendetlen$tsum)
 # quantile(gaz_rendetlen$tper,probs=c(.1,.9),na.rm=TRUE)

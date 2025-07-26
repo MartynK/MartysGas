@@ -1,10 +1,13 @@
-# Trying to simulate weather and learning about quantile regression in the meantime
 
-library(forecast)
-library(splines)
-library(dplyr)
-library(nlme)
-library(ggplot2)
+# ------------------------------------------------------------
+# * Alternative ARIMA approach with additional decomposition
+# * Follows up on `iter6_mods` results
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+
 
 load( here::here( "inst", "iter6_mods.rdata"))
 
@@ -25,7 +28,7 @@ n_future <- 365
 
 # Forecast the future values
 forecasted_values <- forecast(tbats_model, h = n_future)
-plot(forecasted_values)
+fig_tbats_forecast <- capture_plot(plot(forecasted_values))
 
 # Fit the ARIMA model
 # Automatically select the best ARIMA model using the auto.arima() function
@@ -43,11 +46,11 @@ n_future <- 365
 
 # Forecast the future values
 forecasted_values <- forecast(arima_model, h = n_future)
-plot(forecasted_values)
+fig_arima_forecast <- capture_plot(plot(forecasted_values))
 
 # Alternatively, simulate future values
 simulated_values <- simulate(arima_model, n_future)
-plot(simulated_values)
+fig_arima_sim <- capture_plot(plot(simulated_values))
 
 
 mod_spl <- gls( tavg ~ ns( day_in_year, df = 4),
@@ -83,7 +86,7 @@ simulate_year <- function( n = 365,
 
 # Check the autocorrelation of the simulated data
 acf(simulate_year())
-plot(simulate_year(), type = 'l')b# not the same data, invoking again
+fig_sim_year <- capture_plot(plot(simulate_year(), type = 'l')) # not the same data, invoking again
 
 
 pr <- expand.grid( 
@@ -117,14 +120,13 @@ data %>%
   geom_smooth(mapping = aes( x = day_in_year, y = tavg, group = NULL))
 
 # És amit kerestem idáig...
-library(quantreg)
 
 qr_modf <- rq( tavg ~ ns( day_in_year, df = 4), 
              data = data, 
              tau = c(.05,.95))
 
 summary(qr_modf)
-plot(qr_modf$fitted.values)
+fig_qr_fit <- capture_plot(plot(qr_modf$fitted.values))
 
 pr$pred_q05 <- predict(qr_modf, newdata = pr
                        )[,1]

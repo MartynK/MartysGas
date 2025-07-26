@@ -1,10 +1,10 @@
-# Load packages
-library(dplyr)
-library(lubridate)
-library(splines)
-library(splines2)
-library(ggplot2)
-library(nlme)
+
+# ------------------------------------------------------------
+# * Predict next months using LME vs classical LM
+# * Optimizes smoothing parameters via grid search
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
 
 # load the data
 load(here::here("inst","just_model","iter1.rdata"))

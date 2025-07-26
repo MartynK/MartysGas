@@ -1,6 +1,13 @@
 
+# ------------------------------------------------------------
+# * Explore autocorrelation of gas usage
+# * Compare daily vs hourly models
+# * Simulate future temperature series
+# ------------------------------------------------------------
 
-source( here::here( "inst", "function", "load_stuff.r"))
+source(here::here("inst","function","load_stuff.r"))
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
 
 act_year <- 2023
 
@@ -60,7 +67,6 @@ pr %>%
 
 #####
 #ACF intermezzo
-library(nlme)
 
 mod_days_gls <- gls( Rate ~ I(tavg - 20) * ywint, 
                      correlation = corAR1(form = ~ day_dataframe),
@@ -183,11 +189,13 @@ weather_simulated %>%
 
 weather_simulated <- weather_simulated %>%
   ungroup %>%
-  mutate( ywint_sim = ifelse(  day_in_year < 213, 
+  mutate( ywint_sim = ifelse(  day_in_year < 213,
                                year_sim - 1, year_sim),
           rown = 1:n())
 
-with(weather_simulated,plot(rown,ywint_sim,type='l'))
+fig_sim_year <- capture_plot(
+  with(weather_simulated, plot(rown, ywint_sim, type = 'l'))
+)
 
 a <- 0.15
 b <- .5
@@ -196,7 +204,9 @@ weather_simulated <- weather_simulated %>%
   mutate(Rate_sim = (20 - tavg_corr) * b + a) %>%
   mutate(Rate_sim = ifelse( Rate_sim <= a, a, Rate_sim))
 
-with(weather_simulated,plot(tavg_corr,Rate_sim))
+fig_rate_vs_temp <- capture_plot(
+  with(weather_simulated, plot(tavg_corr, Rate_sim))
+)
 
 simulated_consumption <-   weather_simulated %>%
     filter( ywint_sim != min(ywint_sim)) %>%
@@ -211,8 +221,12 @@ simulated_consumption <-   weather_simulated %>%
              )) %>%
     slice(1) 
 
-hist(simulated_consumption$consumed_gas,breaks = round(sqrt(100)+5))
-plot(simulated_consumption$tavg_whencold,simulated_consumption$consumed_gas)
+fig_hist_gas <- capture_plot(
+  hist(simulated_consumption$consumed_gas, breaks = round(sqrt(100)+5))
+)
+fig_temp_vs_gas <- capture_plot(
+  plot(simulated_consumption$tavg_whencold, simulated_consumption$consumed_gas)
+)
 
 
 

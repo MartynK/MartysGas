@@ -1,10 +1,13 @@
-library(readxl)
-library(readr)
-library(dplyr)
-library(lubridate)
-library(nlme)
-library(splines)
-library(ggplot2)
+
+# ------------------------------------------------------------
+# * Explore daily weather CSV file
+# * Compute smoothed temperature series
+# * Visualize yearly patterns in a quick plot
+# ------------------------------------------------------------
+
+source(here::here("inst","function","load_stuff.r"))
+
+capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
 
 #setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
 
@@ -20,9 +23,12 @@ weather <- read_csv("weather.csv") %>%
   filter( is.na(tsum) == FALSE)
 
 
-smooth.spline( weather$day_in_year, weather$tsum) %>% plot(type="l")
-abline(h=10,col="red")
-abline(v=90,col="red")
+fig_spline <- capture_plot({
+  smooth.spline(weather$day_in_year, weather$tsum) %>%
+    plot(type = "l")
+  abline(h = 10, col = "red")
+  abline(v = 90, col = "red")
+})
 
 weather %>%
   mutate(date_yday = parse_date_time(x = as.character(day_in_year), orders = "j") ) %>%
