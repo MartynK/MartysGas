@@ -1,0 +1,27 @@
+---
+title: "Introduction to MartysGas"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to MartysGas}
+  %\VignetteEngine{rmarkdown::html_vignette}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, echo=FALSE}
+library(MartysGas)
+```
+
+This vignette demonstrates basic loading of gas meter data and
+calculation of heating degree metrics.  The example mirrors the early
+analysis steps found in `inst/iter2.r`.
+
+```{r example}
+# sample synthetic data
+set.seed(1)
+dates <- seq(as.POSIXct("2024-01-01"), length.out = 6, by = "1 day")
+meter <- cumsum(c(0, runif(5, 0.8, 1.2)))
+fun <- create_meter_fun(dates, meter)
+rate <- approx_rate(fun, dates)
+
+head(data.frame(Date = dates, Meter = meter, Rate = rate))
+```
