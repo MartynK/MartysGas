@@ -1,10 +1,6 @@
 # Load packages
-library(dplyr)
-library(lubridate)
-library(splines)
-library(splines2)
-library(ggplot2)
-library(nlme)
+source(here::here("inst","function","load_stuff.r"))
+
 
 # Load 'meteostat_weather' & 'obs_day' data
 load( here::here("data","meteostat_data.Rdata")) 

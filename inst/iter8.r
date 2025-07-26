@@ -1,5 +1,3 @@
-library(nlme)
-library(splines)
 
 source( here::here( "inst", "function", "load_stuff.r"))
 
@@ -181,7 +179,6 @@ fig_heatneed_per_year <-
     labs( x = "Day in the season (starts Aug.1st)",
           y = "'Missing degrees until 20' x Days ")
 
-library(lme4)
 dat_days_complete <- obs_days_complete %>% filter(is.na(tavg_low_cumul) == FALSE)
 
 # Convert the data to a groupedData object
@@ -208,7 +205,6 @@ dat_days_complete %>%
     ,group = factor(ywint))) +
   geom_line(mapping = aes(y = predlme),color='salmon4',linewidth=1)
 
-library(boot)
 
 # Define a function to refit the model on a resampled dataset
 boot_model <- function(data, indices) {

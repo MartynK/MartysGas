@@ -1,3 +1,5 @@
+source(here::here("inst","function","load_stuff.r"))
+
 
 dividers = seq.Date(from = {min(dat$Date)+days(365*3)} %>% 
                       as.Date() %>% 

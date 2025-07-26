@@ -1,8 +1,7 @@
 # These are some good old fashioned analyses based on the available transformed data
 # DEPENDSON: data_transforms.r
 
-library(splines)
-library(ggplot2)
+source(here::here("inst","function","load_stuff.r"))
 
 
 USED_UP <-  last(

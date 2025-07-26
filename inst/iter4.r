@@ -1,6 +1,5 @@
-library(dplyr)
-library(lubridate)
-library(splines)
+source(here::here("inst","function","load_stuff.r"))
+
 
 load("tempsextra.rdata")
 

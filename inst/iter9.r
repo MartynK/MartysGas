@@ -1,5 +1,3 @@
-library(nlme)
-library(splines)
 
 source( here::here( "inst", "function", "load_stuff.r"))
 
