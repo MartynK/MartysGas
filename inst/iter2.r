@@ -7,10 +7,7 @@
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
-
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
-
-#setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
+# capture_plot helper is provided by approx_helpers.r
 
 maketsum <- function(date,datelag) {
   
@@ -67,37 +64,6 @@ mod <- lm( Rate ~
 fig_model_effects <- capture_plot(
   mod %>% effects::predictorEffects(residuals = TRUE) %>% plot()
 )
-# 
-# summary(gaz_rendetlen$tsum)
-# quantile(gaz_rendetlen$tper,probs=c(.1,.9),na.rm=TRUE)
-# 
-# BOUND_KNOTS <- -10
-# 
-# mod2 <- gls( Rate ~ ns( tper, 
-#                         df = 3
-#                         ,Boundary.knots = c(1,8)
-#                         ) 
-#              + ywint
-#              #* ns( datenum, 
-#              #       df = 3) 
-#              ,gaz_rendetlen
-#              ,weights = varExp()
-#              # ,correlation = corARMA( form = ~ dtmn,
-#              #                          p = 0, q = 1)
-#              ,na.action = "na.omit"
-#              ,control = glsControl(msMaxIter = 200)
-#              )
-# 
-# mod2 %>% effects::predictorEffects( residuals = TRUE) %>% plot()
-# 
-# summary(mod2)
-# 
-# car::vif(mod2)
-# plot(mod2)
-# qqnorm(mod2, abline = c(0,1))
-# acf( resid( mod2))
-# acf( resid( mod2, type = 'normalized'))
-
 nd <- expand.grid( tsum = seq(0,20,.1),
                    ywint = gaz_rendetlen$ywint[nrow(gaz_rendetlen)])
 nd$pred <- predict( mod, newdata = nd)

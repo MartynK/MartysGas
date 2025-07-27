@@ -7,7 +7,7 @@
 source(here::here("inst","function","load_stuff.r"))
 # These are some good old fashioned analyses based on the available transformed data
 
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+# capture_plot helper is provided by approx_helpers.r
 
 
 source( here::here( "data_transforms.r"))

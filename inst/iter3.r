@@ -6,10 +6,7 @@
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
-
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
-
-#setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
+# capture_plot helper is provided by approx_helpers.r
 
 weather <- read_csv("weather.csv") %>%
   mutate(range = tmax-tmin,

@@ -6,7 +6,7 @@
 
 source(here::here("inst","function","load_stuff.r"))
 
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+# capture_plot helper is provided by approx_helpers.r
 
 
 load( here::here( "inst", "iter6_mods.rdata"))

@@ -1,6 +1,7 @@
 export(create_meter_fun)
 export(approx_rate)
 export(get_avg_temp)
+export(capture_plot)
 export(maketsum)
 export(Maketsum)
 export(simulate_corr_resids)

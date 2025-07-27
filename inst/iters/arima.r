@@ -8,7 +8,7 @@
 source(here::here("inst","function","load_stuff.r"))
 # DEPENDSON: "make_weather_csv.r"
 
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+# capture_plot helper is provided by approx_helpers.r
 
 
 here::here( "make_weather_csv.r") %>% source

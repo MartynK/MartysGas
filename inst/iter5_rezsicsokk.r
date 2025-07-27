@@ -7,7 +7,8 @@ source(here::here("inst","function","load_stuff.r"))
 
 # Price of gas is discounted up to 1730 m3/year, so thats our incentive...
 
-capture_plot <- function(expr) {expr; p <- recordPlot(); invisible(dev.off()); p}
+
+# capture_plot helper is provided by approx_helpers.r
 
 
 gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
