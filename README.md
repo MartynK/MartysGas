@@ -12,7 +12,6 @@ source(here::here("inst", "function", "load_stuff.r"))
 
 This script attaches common packages (dplyr, ggplot2, etc.), loads helper functions from `R/`, and reads previously saved data objects.
 It also defines a small `capture_plot()` helper used by several iterations to
-store base graphics as objects.
 
 ## Iteration overview
 
@@ -51,4 +50,6 @@ store base graphics as objects.
   - Standalone modelling attempts using spline-based approaches to predict gas usage.
 
 Feel free to explore each script in chronological order to see how the analysis evolved.
+
 Old commented-out experiments are parked under `inst/archive`.
+

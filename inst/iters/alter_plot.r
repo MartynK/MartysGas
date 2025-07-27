@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Weather simulation experiments
 # * Quantile regression for temperature extremes
@@ -6,6 +5,7 @@
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
+
 # DEPENDSON: "make_weather_csv.r"
 
 # capture_plot helper is provided by approx_helpers.r

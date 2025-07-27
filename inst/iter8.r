@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Interpolate gas meter readings
 # * Compute cumulative heating need
@@ -8,7 +7,6 @@
 source(here::here("inst","function","load_stuff.r"))
 
 # capture_plot helper is provided by approx_helpers.r
-
 
 act_year <- 2023
 

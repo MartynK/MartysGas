@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Explore daily weather CSV file
 # * Compute smoothed temperature series

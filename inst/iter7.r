@@ -1,3 +1,4 @@
+source(here::here("inst","function","load_stuff.r"))
 
 # ------------------------------------------------------------
 # * Explore autocorrelation of gas usage

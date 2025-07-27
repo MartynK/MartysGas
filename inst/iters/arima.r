@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Forecast temperature with TBATS/ARIMA
 # * Compare simulation output to quantile regression
@@ -6,6 +5,7 @@
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
+
 # DEPENDSON: "make_weather_csv.r"
 
 # capture_plot helper is provided by approx_helpers.r

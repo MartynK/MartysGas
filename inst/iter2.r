@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Approximate hourly temperature from daily data
 # * Join gas meter readings with temperature data

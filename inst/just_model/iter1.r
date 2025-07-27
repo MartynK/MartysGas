@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Experiment with tropical year parameterization
 # * Builds linear mixed models for temperature prediction

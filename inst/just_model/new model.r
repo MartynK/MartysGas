@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Alternative modeling attempt with same data
 # * Explores tropical year features

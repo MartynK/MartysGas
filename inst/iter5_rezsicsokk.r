@@ -1,14 +1,15 @@
-source(here::here("inst","function","load_stuff.r"))
 # ------------------------------------------------------------
 # * Explore heating season 2022/23 gas usage
 # * Fit spline model to temperature curve
 # * Estimate yearly consumption under different scenarios
 # ------------------------------------------------------------
 
-# Price of gas is discounted up to 1730 m3/year, so thats our incentive...
-
+source(here::here("inst","function","load_stuff.r"))
 
 # capture_plot helper is provided by approx_helpers.r
+
+# Some calculations of medium sophistication for the planning on the heating season of 2022/23
+# Price of gas is discounted up to 1730 m3/year, so thats our incentive...
 
 
 gaz <- read_excel("gaz.xlsx", range = "A4:D1343")

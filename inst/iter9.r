@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Full pipeline wrapper script
 # * Cleans weather and gas files
@@ -8,7 +7,6 @@
 source(here::here("inst","function","load_stuff.r"))
 
 # capture_plot helper is provided by approx_helpers.r
-
 
 merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
                          gaz_dir  = "inst/extdata/gaz.xlsx",

@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------
 # * Predict next months using LME vs classical LM
 # * Optimizes smoothing parameters via grid search
