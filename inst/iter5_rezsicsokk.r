@@ -1,4 +1,13 @@
+# ------------------------------------------------------------
+# * Explore heating season 2022/23 gas usage
+# * Fit spline model to temperature curve
+# * Estimate yearly consumption under different scenarios
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
+
+# capture_plot helper is provided by approx_helpers.r
+
 # Some calculations of medium sophistication for the planning on the heating season of 2022/23
 # Price of gas is discounted up to 1730 m3/year, so thats our incentive...
 
@@ -17,18 +26,20 @@ data <- left_join( weather, gaz, by = "date") %>%
 dat_comp <- data[ complete.cases(data[,c("day_in_yr","tavg")]),]
 dat_comp$range <- dat_comp$tmax - dat_comp$tmin
 
-plot(data$date,data$tavg)
+fig_tavg_date <- capture_plot(plot(data$date, data$tavg))
 
-plot(data$day_in_yr,data$tavg)
+fig_tavg_day <- capture_plot(plot(data$day_in_yr, data$tavg))
 
-smooth.spline(dat_comp$day_in_yr,
-              dat_comp$tavg) %>% plot()
+fig_tavg_spline <- capture_plot({
+  smooth.spline(dat_comp$day_in_yr, dat_comp$tavg) %>% plot()
+})
 
 mod_spline <- lm( tavg ~ ns( day_in_yr, df = 8),
                   dat_comp)
 
-effects::predictorEffects( mod_spline,
-                           residuals = TRUE) %>% plot
+fig_mod_spline_eff <- capture_plot(
+  effects::predictorEffects(mod_spline, residuals = TRUE) %>% plot()
+)
 
 
 preds <- data.frame( day_in_yr = 1:365,

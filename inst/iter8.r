@@ -1,5 +1,12 @@
+# ------------------------------------------------------------
+# * Interpolate gas meter readings
+# * Compute cumulative heating need
+# * Fit mixed effects model to cumulative temps
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
 
+# capture_plot helper is provided by approx_helpers.r
 
 act_year <- 2023
 
@@ -187,12 +194,12 @@ dat_days_complete_grouped <- groupedData(tavg_low_cumul ~ day_in_wint | year,
 
 # Fit the nonlinear mixed-effects model
 # takes about a minute
-mod_cum <- nlme(tavg_low_cumul ~ SSlogis(day_in_wint, Asym, xmid, scal), 
-              random = Asym ~ 1 | year, 
+mod_cum <- nlme(tavg_low_cumul ~ SSlogis(day_in_wint, Asym, xmid, scal),
+              random = Asym ~ 1 | year,
               data = dat_days_complete_grouped)
 
 
-plot(mod_cum)
+fig_modcum_diagn <- capture_plot(plot(mod_cum))
 summary(mod_cum)
 dat_days_complete$predlme <- predict(mod_cum)
 
@@ -244,12 +251,12 @@ new_data <- data.frame(day_in_wint = seq(1, 365, by = 1)) # new year prediction 
 # takes about 30 seconds
 mod_cum <- gls(tavg_low_cumul ~ ns(day_in_wint,df=8),
                obs_days_complete,
-               weights=varExp(form = ~ day_in_wint),
+               weights = varExp(form = ~ day_in_wint),
                na.action = na.omit)
 
 #summary(mod_cum)
 #mod_cum %>% effects::predictorEffects(partial.residuals=FALSE) %>% plot
-plot(mod_cum)
+fig_modcum_gls <- capture_plot(plot(mod_cum))
 
 #predict(mod_cum, interval='prediction')
 
@@ -267,11 +274,11 @@ for (i in 1:nrow(sds)) {
 }
 mod_cum_obs <- lm( sd_obs ~ ns(day_in_wint,df=5) - 1
                    ,sds)
-mod_cum_obs %>% 
-  effects::predictorEffects(
-    partial.residuals = TRUE
-    ) %>% 
-  plot()
+fig_cumobs_eff <- capture_plot(
+  mod_cum_obs %>%
+    effects::predictorEffects(partial.residuals = TRUE) %>%
+    plot()
+)
 
 
 sds$sd_pred <- predict(mod_cum_obs)
@@ -327,7 +334,9 @@ sds %>%
 
 mod_cor <- lm(cor_z~ns(day_in_wint,df=3) - 1,sds)
 #summary(mod_cor)
-mod_cor %>% effects::predictorEffects(partial.residuals=TRUE) %>% plot()
+fig_cor_eff <- capture_plot(
+  mod_cor %>% effects::predictorEffects(partial.residuals = TRUE) %>% plot()
+)
 sds$cor_z_pred <- predict(mod_cor, newdata = sds)
 sds <- sds %>% mutate(cor_z_pred = cor_z_pred/max(cor_z_pred,na.rm=TRUE))
 

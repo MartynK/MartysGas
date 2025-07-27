@@ -1,6 +1,14 @@
+# ------------------------------------------------------------
+# * Weather simulation experiments
+# * Quantile regression for temperature extremes
+# * Uses helper script `make_weather_csv.r`
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
-# Trying to simulate weather and learning about quantile regression in the meantime
+
 # DEPENDSON: "make_weather_csv.r"
+
+# capture_plot helper is provided by approx_helpers.r
 
 
 here::here( "make_weather_csv.r") %>% source
@@ -63,7 +71,7 @@ simulate_year <- function( n = 365,
 
 # Check the autocorrelation of the simulated data
 acf(simulate_year())
-plot(simulate_year(), type = 'l')
+fig_sim_year <- capture_plot(plot(simulate_year(), type = 'l'))
 
 
 pr <- expand.grid( 
@@ -105,7 +113,7 @@ qr_90 <- rq( tavg ~ ns( day_in_year, df = 4),
              tau = c(.05,.95))
 
 summary(qr_90)
-plot(qr_90$fitted.values)
+fig_qr_fit <- capture_plot(plot(qr_90$fitted.values))
 
 pr$pred_q05 <- predict(qr_90, newdata = pr)[,1]
 pr$pred_q95 <- predict(qr_90, newdata = pr)[,2]

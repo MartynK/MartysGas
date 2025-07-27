@@ -1,5 +1,12 @@
+# ------------------------------------------------------------
+# * Full pipeline wrapper script
+# * Cleans weather and gas files
+# * Computes cumulative heating need for current year
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
 
+# capture_plot helper is provided by approx_helpers.r
 
 merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
                          gaz_dir  = "inst/extdata/gaz.xlsx",

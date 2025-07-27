@@ -1,4 +1,11 @@
+# ------------------------------------------------------------
+# * Alternative modeling attempt with same data
+# * Explores tropical year features
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
+
+# capture_plot helper is provided by approx_helpers.r
 
 load( here::here("data","meteostat_data.Rdata")) 
 #load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow suff's output
@@ -34,7 +41,9 @@ mod <- lm(tavg ~
           , data = data)
 
 #mod %>% effects::predictorEffects(partial.residuals = TRUE) %>% plot() %>% try()
-mod %>% effects::predictorEffects(partial.residuals = FALSE) %>% plot() %>% try()
+fig_effects <- capture_plot(
+  mod %>% effects::predictorEffects(partial.residuals = FALSE) %>% plot()
+) %>% try()
 
 car::vif(mod) %>% try()
 anova(mod)
@@ -63,9 +72,9 @@ ggplot(d2, aes(x = Date, y = pred,
 
 
 par(mfrow = c(2,1))
-plot(d2$tropical_year_sin_component)
+fig_trop_sin <- capture_plot(plot(d2$tropical_year_sin_component))
 abline(v = 80)
-plot(d2$tropical_year_loc_sin)
+fig_trop_loc <- capture_plot(plot(d2$tropical_year_loc_sin))
 abline(v = 80)
 par(mfrow = c(1,1))
 
@@ -80,9 +89,9 @@ mod_lme <- lme(tavg ~
 BIC(mod_lme)
 
 # plot the ranefs
-mod_lme %>% ranef() %>% plot()
+fig_ranef <- capture_plot(mod_lme %>% ranef() %>% plot())
 
-mod_lme %>% effects::predictorEffects() %>% plot()
+fig_lme_eff <- capture_plot(mod_lme %>% effects::predictorEffects() %>% plot())
 
 # plot the predictions of the model
 data$pred_lme <- predict(mod_lme)
@@ -348,13 +357,13 @@ out_rmses %>%
 
 # Fit final model on all the data
 
-mod_final <- lme(tavg ~ 
+mod_final <- lme(tavg ~
                    ns(tropical_year_loc_sin, df = 1)
                  + ns(tropical_year_sin_component, df = 3)
                  , data = data
                  , random = ~ ns(tropical_year_loc_sin,df=2)[,] | ywint)
 
-plot(mod_final)
+fig_mod_final <- capture_plot(plot(mod_final))
 
 # make the data to predict on
 pred <- seq.Date(as.Date("2024-01-01"),

@@ -1,9 +1,12 @@
+# ------------------------------------------------------------
+# * Backup of early heating season analysis
+# * Builds GAM curves for temperature vs usage
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
 # These are some good old fashioned analyses based on the available transformed data
 
-
-source( here::here( "data_transforms.r"))
-
+# capture_plot helper is provided by approx_helpers.r
 
 # curves based on daily avg. temp
 temps_xtra %>%

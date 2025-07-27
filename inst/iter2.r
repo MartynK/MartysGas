@@ -1,6 +1,12 @@
-source(here::here("inst","function","load_stuff.r"))
+# ------------------------------------------------------------
+# * Approximate hourly temperature from daily data
+# * Join gas meter readings with temperature data
+# * Fit a simple model to explain hourly gas rate
+# * Compare model predictions across years
+# ------------------------------------------------------------
 
-#setwd("~/OneDrive_mrkmarton/-/Dinamikus Kiválóság Menedzsment - General/Stats, R/R/Martys gas")
+source(here::here("inst","function","load_stuff.r"))
+# capture_plot helper is provided by approx_helpers.r
 
 maketsum <- function(date,datelag) {
   
@@ -38,9 +44,11 @@ gaz_rendetlen$dtmn <- (gaz_rendetlen$dtmn / 3600 /24 -17873) %>% round(digits=2)
 
 #View(gaz_rendetlen)
 
-plot(temps_xtra$splined_temp,type="l")
+fig_spline_temp <- capture_plot(plot(temps_xtra$splined_temp, type = "l"))
 
-plot(gaz_rendetlen$tsum, gaz_rendetlen$Rate)
+fig_gasrate_scatter <- capture_plot(
+  plot(gaz_rendetlen$tsum, gaz_rendetlen$Rate)
+)
 
 mod <- lm( Rate ~ 
            (
@@ -52,38 +60,9 @@ mod <- lm( Rate ~
            , 
            gaz_rendetlen)
 
-mod %>% effects::predictorEffects( residuals = TRUE) %>% plot()
-# 
-# summary(gaz_rendetlen$tsum)
-# quantile(gaz_rendetlen$tper,probs=c(.1,.9),na.rm=TRUE)
-# 
-# BOUND_KNOTS <- -10
-# 
-# mod2 <- gls( Rate ~ ns( tper, 
-#                         df = 3
-#                         ,Boundary.knots = c(1,8)
-#                         ) 
-#              + ywint
-#              #* ns( datenum, 
-#              #       df = 3) 
-#              ,gaz_rendetlen
-#              ,weights = varExp()
-#              # ,correlation = corARMA( form = ~ dtmn,
-#              #                          p = 0, q = 1)
-#              ,na.action = "na.omit"
-#              ,control = glsControl(msMaxIter = 200)
-#              )
-# 
-# mod2 %>% effects::predictorEffects( residuals = TRUE) %>% plot()
-# 
-# summary(mod2)
-# 
-# car::vif(mod2)
-# plot(mod2)
-# qqnorm(mod2, abline = c(0,1))
-# acf( resid( mod2))
-# acf( resid( mod2, type = 'normalized'))
-
+fig_model_effects <- capture_plot(
+  mod %>% effects::predictorEffects(residuals = TRUE) %>% plot()
+)
 nd <- expand.grid( tsum = seq(0,20,.1),
                    ywint = gaz_rendetlen$ywint[nrow(gaz_rendetlen)])
 nd$pred <- predict( mod, newdata = nd)

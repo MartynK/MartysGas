@@ -1,6 +1,14 @@
+# ------------------------------------------------------------
+# * Forecast temperature with TBATS/ARIMA
+# * Compare simulation output to quantile regression
+# * Uses `make_weather_csv.r` for raw data
+# ------------------------------------------------------------
+
 source(here::here("inst","function","load_stuff.r"))
-# Trying to simulate weather and learning about quantile regression in the meantime
+
 # DEPENDSON: "make_weather_csv.r"
+
+# capture_plot helper is provided by approx_helpers.r
 
 
 here::here( "make_weather_csv.r") %>% source
@@ -41,7 +49,7 @@ n_future <- 365
 
 # Forecast the future values
 forecasted_values <- forecast(tbats_model, h = n_future)
-plot(forecasted_values)
+fig_tbats_forecast <- capture_plot(plot(forecasted_values))
 
 # Fit the ARIMA model
 # Automatically select the best ARIMA model using the auto.arima() function
@@ -59,11 +67,11 @@ n_future <- 365
 
 # Forecast the future values
 forecasted_values <- forecast(arima_model, h = n_future)
-plot(forecasted_values)
+fig_arima_forecast <- capture_plot(plot(forecasted_values))
 
 # Alternatively, simulate future values
 simulated_values <- simulate(arima_model, n_future)
-plot(simulated_values)
+fig_arima_sim <- capture_plot(plot(simulated_values))
 
 
 mod_spl <- gls( tact ~ 
@@ -108,7 +116,7 @@ simulate_year <- function( n = 365,
 
 # Check the autocorrelation of the simulated data
 acf(simulate_year())
-plot(simulate_year(), type = 'l')
+fig_sim_year <- capture_plot(plot(simulate_year(), type = 'l'))
 
 
 pr <- expand.grid( 
@@ -150,7 +158,7 @@ qr_90 <- rq( tavg ~ ns( day_in_year, df = 4),
              tau = c(.05,.95))
 
 summary(qr_90)
-plot(qr_90$fitted.values)
+fig_qr_fit <- capture_plot(plot(qr_90$fitted.values))
 
 pr$pred_q05 <- predict(qr_90, newdata = pr)[,1]
 pr$pred_q95 <- predict(qr_90, newdata = pr)[,2]

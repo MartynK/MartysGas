@@ -42,3 +42,19 @@ get_avg_temp <- function(df, var = "tavg", var_time = "Date", xmin, xmax) {
   duration <- as.numeric(difftime(xmax, xmin, units = "secs"))
   integrated / duration
 }
+
+#' Capture base plot output as a recordable object
+#'
+#' Evaluates an expression that generates a base R plot and
+#' returns the plot as a `recordedplot` object.
+#'
+#' @param expr Expression containing plotting code
+#' @return `recordedplot` object
+#' @export
+capture_plot <- function(expr) {
+  expr
+  p <- recordPlot()
+  invisible(dev.off())
+  p
+}
+
