@@ -1,9 +1,18 @@
+<<<<<<< Updated upstream
 # ------------------------------------------------------------
 # * Alternative modeling attempt with same data
 # * Explores tropical year features
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
+=======
+library(dplyr)
+library(lubridate)
+library(splines)
+library(splines2)
+library(ggplot2)
+library(nlme)
+>>>>>>> Stashed changes
 
 # capture_plot helper is provided by approx_helpers.r
 
