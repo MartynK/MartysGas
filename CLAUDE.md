@@ -199,7 +199,7 @@ The project follows an iterative exploration pattern:
 
 - Weather data: `inst/extdata/meteostat_data/` → processed via `merge_transform_weather()` → `data/meteostat_data.Rdata`
 - Gas data: `inst/extdata/gaz.xlsx` → processed in iter scripts → various `.rdata` files
-- Models: Trained models saved in `inst/function/backend/` for reuse across scripts
+- Models: Trained models saved in `data/` directory for reuse across scripts (consolidated from `inst/function/backend/`)
 
 ### Exported Functions
 
@@ -210,15 +210,21 @@ Core utilities (see NAMESPACE):
 - `load_all_Rdata()`: Batch data loading
 - `merge_transform_weather()`: Weather data preprocessing
 
-### Script Chronology
+### Script Chronology & Current Status (Updated 2025-08-01)
 
 The `iter*.r` scripts represent the project evolution:
-- iter2-3: Basic data cleaning and exploration
-- iter4: Sinusoidal temperature modeling
-- iter5: Heating season forecasting with scenarios
-- iter6: Advanced modeling with transformations
-- iter7-8: Linear/GLS models and residual analysis
-- iter9: Integration of updated weather data
+- **iter2**: ✅ **Fixed & Working** - Basic data cleaning, temp sums, linear models (fixed column name issues)
+- **iter3**: ⚠️ **Untested** - Weather exploration and CSV processing
+- **iter4**: ✅ **Working** - Sinusoidal temperature modeling, prediction grids
+- **iter5**: ⚠️ **Untested** - Heating season forecasting with scenarios  
+- **iter6**: ⚠️ **Untested** - Advanced modeling with transformations
+- **iter7-8**: ⚠️ **Heavy computation** - Linear/GLS models and residual analysis
+- **iter9**: ⚠️ **Heavy I/O** - Integration of updated weather data (35 Excel files)
+
+**Specialized Scripts:**
+- **just_model/iter1.r**: ✅ **Working** - Tropical year modeling, mixed effects
+- **just_model/iter2.r**: ⚠️ **Heavy** - Grid search optimization (>2 minutes)
+- **iters/arima.r**: ✅ **Mostly Fixed** - TBATS/ARIMA time series (minor remaining issues)
 
 Each script builds on previous work while exploring new modeling approaches.
 
@@ -286,3 +292,44 @@ The codebase demonstrates several distinct analytical approaches:
 - **Hierarchical modeling**: Mixed effects to handle grouping structures
 - **Simulation-based inference**: Monte Carlo methods for uncertainty quantification
 - **Interpolation/approximation**: Handling irregular data and rate calculations
+
+## Recent Fixes & Data Management (2025-08-01)
+
+### ✅ Major Issues Resolved
+
+1. **Data File Organization**: 
+   - Consolidated all `.rdata` files to `data/` directory
+   - Removed duplicates from `inst/` subdirectories
+   - Fixed inconsistent save/load patterns across scripts
+
+2. **Script Dependencies Fixed**:
+   - **iter2.r**: Fixed column name mismatches (`temps_xtra$tavg` → `temps_xtra$temp`, `tsum` → `tact`)
+   - **iters/arima.r**: Fixed missing dependency (`make_weather_csv.r` exists in project root)
+   - **iters/arima.r**: Changed data source to `iter6_mods.rdata` for complete variable set
+   - **just_model/iter1.r**: Updated save path to use `data/` directory
+
+3. **Variable Name Consistency**:
+   - Standardized temperature variable references across scripts
+   - Fixed plotting and modeling variable mismatches
+   - Ensured data pipeline integrity
+
+### 🔧 Current Architecture Notes
+
+**Data Loading Hierarchy**:
+- `load_stuff.r` → Core packages + `meteostat_data.Rdata`
+- Script-specific loads: `tempsextra.rdata`, `iter6_mods.rdata`, `iter1.rdata`
+- Backend models: `mod_tavg.Rdata`, `mod_range.Rdata`, `weather_simulated.Rdata`
+
+**Working Scripts** (tested successfully):
+- `inst/function/load_stuff.r`
+- `inst/iter2.r` 
+- `inst/iter4.r`
+- `inst/just_model/iter1.r`
+
+**Heavy Computational Scripts** (>1 minute runtime):
+- `inst/just_model/iter2.r` (grid search optimization)
+- `inst/iter8.r` (NLME modeling)
+- `inst/iter9.r` (35 Excel file processing)
+
+**Partially Fixed Scripts**:
+- `inst/iters/arima.r` (runs ~98%, minor variable scoping issue remains)
