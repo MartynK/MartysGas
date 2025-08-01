@@ -10,7 +10,8 @@
       "Bash(cp:*)",
       "Bash(# Move all .rdata/.Rdata files to data/ folder\ncd /mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas\n\n# Move main inst/ .rdata files\ncp inst/data_transforms_out.rdata data/\ncp inst/iter6_mods.rdata data/\ncp inst/pred_rate.rdata data/\ncp inst/pred_temps.rdata data/\ncp inst/tempsextra.rdata data/\ncp inst/weather.rdata data/\n\n# Move backend files\ncp inst/function/backend/df_optimization.rdata data/\ncp inst/function/backend/mod_range.Rdata data/\ncp inst/function/backend/mod_tavg.Rdata data/\ncp inst/function/backend/weather_simulated.Rdata data/\n\n# Move report file\ncp inst/Report_heatneed/end_state.rdata data/\n\necho \"\"Files moved to data/:\"\"\nls -la data/*.rdata data/*.Rdata)",
       "Bash(mv:*)",
-      "Bash(R:*)"
+      "Bash(R:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

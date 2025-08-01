@@ -6,7 +6,8 @@
 
 source(here::here("inst","function","load_stuff.r"))
 
-load(here::here("data", "tempsextra.rdata"))
+# Load the complete workspace with enhanced temps_xtra from iter6_mods
+load(here::here("data", "iter6_mods.rdata"))
 
 # DEPENDSON: "make_weather_csv.r"
 
@@ -34,7 +35,7 @@ dayinwint_to_dayinyr <- function(d) {
 
 # Create a time series object with your mean temperature data
 # Replace 'mean_temperature_data' with your actual data
-mean_temperature_ts <- ts(data$tavg, frequency = 180) # Assuming daily data
+mean_temperature_ts <- ts(dat_comp$tavg, frequency = 180) # Assuming daily data
 
 # something is fishy no wonder ARIMA, TBATS are confused
 mean_temperature_ts %>% decompose() %>% plot
@@ -84,7 +85,7 @@ mod_spl <- gls( tact ~
                             sample(1:nrow(temps_xtra), size = 1000)
                             ,], # serious impact on runtime
                correlation = corAR1(value = .9,
-                                    form = ~ tim|year))
+                                    form = ~ 1|ywint))
 
 resid(mod_spl,type = "normalized") %>% acf
 

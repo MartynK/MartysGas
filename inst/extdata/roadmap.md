@@ -12,12 +12,12 @@ This document traces the "birth and death" of key R objects throughout the Marty
 | Script | Status | Runtime | Key Issues | Computational Load |
 |--------|--------|---------|------------|-------------------|
 | **load_stuff.r** | ✅ **Working** | ~4 seconds | None | Light - package loading |
-| **iter2.r** | ❌ **Fails** | <5 seconds | Hungarian column names (`Mérő` vs `Mero`) | Light if fixed |
-| **iter3.r** | ✅ **Working** | ~4 seconds | None | Light - CSV processing |
-| **iter4.r** | ⚠️ **Depends** | ~5 seconds | Requires pred_rate.rdata | Light |
-| **iter5_rezsicsokk.r** | ✅ **Ready** | ~4 seconds | Dependencies available | Light |
-| **iter6_mods.r** | ✅ **Ready** | Unknown | GAM modeling expected | Moderate |
-| **iter7.r** | ✅ **Ready** | Unknown | GLS correlation models | Moderate |
+| **iter2.r** | ✅ **Fixed** | ~10 seconds | Fixed temps_xtra column references, tsum→tact | Light |
+| **iter3.r** | ⚠️ **Untested** | ~4 seconds | Unknown | Light - CSV processing |
+| **iter4.r** | ✅ **Working** | ~5 seconds | Dependencies available | Light |
+| **iter5_rezsicsokk.r** | ⚠️ **Untested** | ~4 seconds | Dependencies available | Light |
+| **iter6_mods.r** | ⚠️ **Untested** | Unknown | GAM modeling expected | Moderate |
+| **iter7.r** | ⚠️ **Untested** | Unknown | GLS correlation models | Moderate |
 | **iter8.r** | ⚠️ **Heavy** | **>1 minute** | NLME modeling (~1 min), GLS (~30s) | **Heavy** |
 | **iter9.r** | ⚠️ **Heavy** | **>30 seconds** | Processes 35 Excel files | **Heavy I/O** |
 
@@ -28,11 +28,11 @@ This document traces the "birth and death" of key R objects throughout the Marty
 | **mod_tavg.r** | ✅ **Ready** | 5-15 seconds | GLS with AR(1) correlation |
 | **mod_range.r** | ✅ **Ready** | 5-15 seconds | GLS with AR(1) correlation |
 | **weather_simulated_100ys.r** | ⚠️ **Heavy** | **30-60 seconds** | 100-year simulation (36,500 days) |
-| **just_model/iter1.r** | ✅ **Ready** | 10-30 seconds | Mixed-effects modeling |
-| **just_model/iter2.r** | ❌ **Blocked** | **2-5 minutes** | Needs iter1.rdata; 75 parameter grid search |
+| **just_model/iter1.r** | ✅ **Working** | 10-30 seconds | Mixed-effects modeling |
+| **just_model/iter2.r** | ⚠️ **Heavy** | **>2 minutes** | Grid search optimization; very computationally intensive |
 | **just_model/iter3.r** | ❌ **Blocked** | Unknown | Depends on iter2 results |
-| **iters/arima.r** | ❌ **Fails** | **1-3 minutes** | Missing make_weather_csv.r |
-| **iters/arima_v2.r** | ✅ **Ready** | 1-2 minutes | TBATS + ARIMA modeling |
+| **iters/arima.r** | ❌ **Fails** | **1-3 minutes** | Time series contains internal NAs |
+| **iters/arima_v2.r** | ⚠️ **Untested** | 1-2 minutes | TBATS + ARIMA modeling |
 
 ### Critical Performance Bottlenecks
 
@@ -58,10 +58,11 @@ This document traces the "birth and death" of key R objects throughout the Marty
 
 | Issue | Affected Scripts | Resolution Required |
 |-------|------------------|-------------------|
-| **Hungarian column names** | iter2.r | Fix `Mérő` → `Mero`, `Dátum` → `Datum` |
-| **Missing iter1.rdata** | just_model/iter2.r, iter3.r | Run iter1.r first |
+| **Column name mismatches** | iter2.r | ✅ **FIXED** - Updated temps_xtra column references |
+| **Variable name inconsistencies** | iter2.r | ✅ **FIXED** - Changed tsum→tact throughout |
+| **Missing .rdata file cleanup** | Multiple | ✅ **FIXED** - Moved all .rdata to data/, removed duplicates |
+| **Time series NA values** | iters/arima.r | Time series contains internal NAs, needs data cleaning |
 | **Missing make_weather_csv.r** | iters/arima.r, alter_plot.r | Create or locate missing script |
-| **Path issues** | Multiple scripts | Excel files expect local paths vs extdata/ |
 
 ### Execution Workflow Recommendations
 
@@ -75,7 +76,7 @@ This document traces the "birth and death" of key R objects throughout the Marty
 - iter8.r → iter9.r → just_model/iter2.r → weather_simulated_100ys.r
 
 **Blocked Scripts (require fixes):**
-- iter2.r (column names) → iter4.r (dependencies) → just_model/iter2.r,iter3.r → iters/arima.r
+- iters/arima.r (NA values in time series) → make_weather_csv.r (missing dependency)
 
 ## Main Iteration Scripts (`iter*.r`)
 
@@ -242,12 +243,13 @@ This document traces the "birth and death" of key R objects throughout the Marty
 - **Predictions**: Basic `nd` grids → Comprehensive `preds` matrices → Scenario ensembles
 - **Visualizations**: Unnamed plots → `fig_*` objects → Dashboard-style displays
 
-### Save/Load Patterns
-- **iter3.r saves** → `pred_temps.rdata` → **Used in iter4.r**
-- **iter5.r saves** → `iter6_mods.rdata` → **Used in arima_v2.r**  
-- **iter1.r saves** → `iter1.rdata` → **Used in iter2.r**
-- **iter2.r saves** → `df_optimization.rdata` → **Used in iter3.r**
-- **Backend saves** → Model .Rdata files → **Used by simulation functions**
+### Save/Load Patterns - UPDATED 2025-08-01
+- **All .rdata files consolidated** → `data/` directory → **No duplicates in inst/**
+- **iter4.r saves** → `data/pred_temps.rdata` → **Used across multiple scripts**
+- **iter6_mods.r saves** → `data/iter6_mods.rdata` → **Used in arima_v2.r**  
+- **just_model/iter1.r saves** → `data/iter1.rdata` → **Used in just_model/iter2.r**
+- **Backend saves** → `data/*.Rdata` → **Used by simulation functions**
+- **gazf.r saves** → `data/pred_rate.rdata` → **Used in multiple analysis scripts**
 
 ## Key Insights
 
@@ -265,10 +267,13 @@ This document traces the "birth and death" of key R objects throughout the Marty
 - **just_model/**: Astronomical precision with tropical year modeling
 - **iters/**: Time series sophistication with ARIMA/TBATS
 
-### Data Management Observations
-- Inconsistent intermediate saving leads to long script dependencies
-- Object naming becomes more systematic in later iterations
+### Data Management Observations - UPDATED 2025-08-01
+- ✅ **RESOLVED**: .rdata file organization - all moved to data/ directory
+- ✅ **RESOLVED**: Column name mismatches fixed (temps_xtra columns, tsum→tact)
+- ✅ **IMPROVED**: Consistent load/save patterns across scripts
 - Backend infrastructure supports reusable model components
 - Alternative approaches maintain separate object namespaces
+- Key scripts now functional: iter2.r, iter4.r, just_model/iter1.r
+- Heavy computational scripts identified: just_model/iter2.r (>2min), iter8.r, iter9.r
 
 This roadmap reveals a sophisticated evolution from basic temperature-consumption modeling to comprehensive forecasting systems, with objects progressively gaining complexity and predictive power throughout the iterative development process.

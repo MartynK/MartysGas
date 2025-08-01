@@ -151,4 +151,4 @@ fig_7_prediction_2024_lme <-
 
 fig_7_prediction_2024_lme
 
-save.image(here::here("inst","just_model","iter1.rdata"))
+save.image(here::here("data","iter1.rdata"))
