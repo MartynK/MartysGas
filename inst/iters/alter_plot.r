@@ -6,6 +6,8 @@
 
 source(here::here("inst","function","load_stuff.r"))
 
+load(here::here("data", "tempsextra.rdata"))
+
 # DEPENDSON: "make_weather_csv.r"
 
 # capture_plot helper is provided by approx_helpers.r

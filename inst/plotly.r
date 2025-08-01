@@ -1,6 +1,17 @@
 # based on https://plotly.com/r/3d-scatter-plots/
 
 library(plotly)
+source(here::here("inst","function","load_stuff.r"))
+load(here::here("data", "tempsextra.rdata"))
+
+# Create temps_xtra_nice object
+temps_xtra_nice <- temps_xtra %>%
+  filter( ywint != "2019" |
+          tact > 10) %>%
+  mutate( heat_off = 
+    ifelse( day_in_year > 258 |
+              day_in_year < 135,  "on", "off")
+    )
 
 mtcars$am[which(mtcars$am == 0)] <- 'Automatic'
 mtcars$am[which(mtcars$am == 1)] <- 'Manual'

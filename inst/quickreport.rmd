@@ -27,7 +27,7 @@ knitr::opts_chunk$set(echo = FALSE,
 library(dplyr)
 library(ggplot2)
 library(lubridate)
-source(here::here("iter6_mods.r"))
+source(here::here("inst", "iter6_mods.r"))
 #load(here::here("iter6_mods.rdata"))
 
 ```

@@ -4,6 +4,9 @@
 # ------------------------------------------------------------
 
 source(here::here("inst","function","load_stuff.r"))
+
+load(here::here("data", "tempsextra.rdata"))
+
 # These are some good old fashioned analyses based on the available transformed data
 
 # capture_plot helper is provided by approx_helpers.r
