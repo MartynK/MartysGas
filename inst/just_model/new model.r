@@ -12,7 +12,6 @@ library(splines)
 library(splines2)
 library(ggplot2)
 library(nlme)
->>>>>>> Stashed changes
 
 # capture_plot helper is provided by approx_helpers.r
 
@@ -250,8 +249,7 @@ out <- out %>%
 
 df_optimization <- out
 save(df_optimization, 
-     file = here::here("inst","function",
-                       "backend","df_optimization.rdata"))
+     file = here::here("data", "df_optimization.rdata"))
 
 # plot out like heatmap
 out %>% 

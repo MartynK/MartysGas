@@ -12,13 +12,13 @@ source(here::here("inst","function","load_stuff.r"))
 # Price of gas is discounted up to 1730 m3/year, so thats our incentive...
 
 
-gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
+gaz <- read_excel(here::here("inst", "extdata", "gaz.xlsx"), range = "A4:D1343")
 colnames(gaz) <- c("date", "day_in_year_good", "nextdate", "rate")
 #View(gaz)
 
-weather <- read_csv("weather.csv")
+weather <- read_csv(here::here("inst", "weather.csv"))
 
-load("pred_rate.rdata")
+load(here::here("data", "pred_rate.rdata"))
 
 data <- left_join( weather, gaz, by = "date") %>%
   mutate( day_in_yr = ifelse( day_in_year_good < 185, day_in_year_good + 180,day_in_year_good - 180))

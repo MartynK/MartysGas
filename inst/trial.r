@@ -1,5 +1,10 @@
+# This was a randomized trial where I would construct a randomlist
+# Whether to close the outer door to my house at night and see the amount of gas
+# I would use per day and to note any change in gas consumption
+# Correcting for the actual temperature outside
+
 library(readxl)
-trial <- read_excel("trial.xlsx", na = "NA")
+trial <- read_excel(here::here("inst", "trial.xlsx"), na = "NA")
 #View(trial)
 trial$date <- as.Date(trial$date)
 

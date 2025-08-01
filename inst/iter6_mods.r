@@ -300,4 +300,4 @@ fig_6 <- preds_day %>%
   geom_line( mapping = aes( x = tact, y = pred), data = nd, color = "blue") +
   labs( caption = "Comparing two models; blue is virtually guaranteed to have no autocorrelation")
 
-save.image( file = "iter6_mods.rdata")
+save.image( file = here::here("data", "iter6_mods.rdata"))

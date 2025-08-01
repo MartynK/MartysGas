@@ -22,12 +22,12 @@ maketsum <- function(date,datelag) {
 }
 Maketsum <- Vectorize(maketsum)
 
-gaz_rendetlen <- read_excel("gaz.xlsx", sheet = "Mero_rendetlen")
+gaz_rendetlen <- read_excel(here::here("inst", "extdata", "gaz.xlsx"), sheet = "Mero_rendetlen")
 
 gaz_rendetlen <- gaz_rendetlen %>% 
-         rename( Value = Mérő, 
-                       Date = Dátum, 
-                       Gas = Gáz, 
+         rename( Value = Mero, 
+                       Date = Datum, 
+                       Gas = Gaz, 
                        Day = Nap) %>%
          mutate( Date = as_datetime(Date),
                  datelag = lag(Date),

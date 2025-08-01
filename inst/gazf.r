@@ -6,11 +6,11 @@ library(lubridate)
 library(ggplot2)
 library(nlme)
 
-gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
+gaz <- read_excel(here::here("inst", "extdata", "gaz.xlsx"), range = "A4:D1343")
 colnames(gaz) <- c("date", "day_in_yr", "nextdate", "rate")
 #View(gaz)
 
-weather <- read_csv("weather.csv")
+weather <- read_csv(here::here("inst", "weather.csv"))
 
 data <- left_join( weather, gaz, by = "date")
 
@@ -67,7 +67,7 @@ se <- sqrt((predict(mod3)^2*mod3$modelStruct$varStruct))
 
 plot(effects::predictorEffects(mod3, partial.residuals = TRUE))
 BIC(mod3)
-car::vif(mod3)
+# car::vif(mod3)
 
 
 
@@ -130,5 +130,5 @@ t <- mod4 %>% effects::predictorEffects() %>%
 simp_out <- data.frame( rate = rate,
                         t    = t)
 
-save(simp_out, mod4, file ="pred_rate.rdata")
+save(simp_out, mod4, file = here::here("data", "pred_rate.rdata"))
 

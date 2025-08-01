@@ -11,4 +11,4 @@ mod_range <- gls( range ~ ns( day_in_year, df = 4),
                   correlation = corAR1(value = .5,
                                        form = ~ day_in_year|year))
 
-save(mod_range, file = here::here("inst","function","backend","mod_range.Rdata"))
+save(mod_range, file = here::here("data", "mod_range.Rdata"))

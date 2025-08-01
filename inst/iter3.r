@@ -7,7 +7,7 @@
 source(here::here("inst","function","load_stuff.r"))
 # capture_plot helper is provided by approx_helpers.r
 
-weather <- read_csv("weather.csv") %>%
+weather <- read_csv(here::here("inst", "weather.csv")) %>%
   mutate(range = tmax-tmin,
          tsum  = (tmax + tmin + tavg ) / 3,
          day_in_year = yday(date),

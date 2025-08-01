@@ -1,6 +1,6 @@
 source(here::here("inst","function","load_stuff.r"))
 
-load("tempsextra.rdata")
+load(here::here("data", "tempsextra.rdata"))
 
 temps_xtra <- temps_xtra %>%
   mutate( day_in_year = yday(date),
@@ -17,4 +17,4 @@ preds <- expand.grid( day_in_year = 1:365,
 
 preds$pred <- predict(mod, newdata = preds)
 
-save(preds, temps_xtra, file = "pred_temps.rdata")
+save(preds, temps_xtra, file = here::here("data", "pred_temps.rdata"))

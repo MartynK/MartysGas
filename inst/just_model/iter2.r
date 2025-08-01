@@ -6,7 +6,7 @@
 source(here::here("inst","function","load_stuff.r"))
 
 # load the data
-load(here::here("inst","just_model","iter1.rdata"))
+load(here::here("data","iter1.rdata"))
 
 predict_nxt_n_month <- function(data, divider = as.Date("2023-11-20"), 
                                 df_b = 5, df_c = 4, df_rand = 2,
@@ -138,8 +138,7 @@ out <- out %>%
   )
 df_optimization <- out
 save(df_optimization, 
-     file = here::here("inst","function",
-                       "backend","df_optimization.rdata"))
+     file = here::here("data", "df_optimization.rdata"))
 
 # plot out like heatmap
 out %>% 

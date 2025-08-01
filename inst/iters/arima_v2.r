@@ -8,7 +8,7 @@ source(here::here("inst","function","load_stuff.r"))
 # capture_plot helper is provided by approx_helpers.r
 
 
-load( here::here( "inst", "iter6_mods.rdata"))
+load( here::here("data", "iter6_mods.rdata"))
 
 # Create a time series object with your mean temperature data
 mean_temperature_ts <- ts(data$tavg, frequency = 180) # Assuming daily data

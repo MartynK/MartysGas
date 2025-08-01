@@ -12,4 +12,4 @@ mod_tavg <- gls( tavg ~ ns( day_in_year,df = 4),
                  correlation = corAR1(value = .8,
                                       form = ~ day_in_year|year))
 
-save(mod_tavg, file = here::here("inst","function","backend","mod_tavg.Rdata"))
+save(mod_tavg, file = here::here("data", "mod_tavg.Rdata"))

@@ -69,6 +69,7 @@ pr %>%
 #####
 #ACF intermezzo
 
+# long execution
 mod_days_gls <- gls( Rate ~ I(tavg - 20) * ywint, 
                      correlation = corAR1(form = ~ day_dataframe),
                      obs_days_mod)

@@ -2,6 +2,81 @@
 
 This document traces the "birth and death" of key R objects throughout the MartysGas codebase, documenting where objects are created, transformed, used, and saved across the various analysis scripts.
 
+## Runtime Analysis & Error Report
+
+**Analysis Date**: 2025-08-01  
+**Execution Environment**: WSL2 Linux with R package libraries
+
+### Script Execution Status & Performance
+
+| Script | Status | Runtime | Key Issues | Computational Load |
+|--------|--------|---------|------------|-------------------|
+| **load_stuff.r** | ✅ **Working** | ~4 seconds | None | Light - package loading |
+| **iter2.r** | ❌ **Fails** | <5 seconds | Hungarian column names (`Mérő` vs `Mero`) | Light if fixed |
+| **iter3.r** | ✅ **Working** | ~4 seconds | None | Light - CSV processing |
+| **iter4.r** | ⚠️ **Depends** | ~5 seconds | Requires pred_rate.rdata | Light |
+| **iter5_rezsicsokk.r** | ✅ **Ready** | ~4 seconds | Dependencies available | Light |
+| **iter6_mods.r** | ✅ **Ready** | Unknown | GAM modeling expected | Moderate |
+| **iter7.r** | ✅ **Ready** | Unknown | GLS correlation models | Moderate |
+| **iter8.r** | ⚠️ **Heavy** | **>1 minute** | NLME modeling (~1 min), GLS (~30s) | **Heavy** |
+| **iter9.r** | ⚠️ **Heavy** | **>30 seconds** | Processes 35 Excel files | **Heavy I/O** |
+
+### Backend & Specialized Scripts
+
+| Script | Status | Runtime | Computational Load |
+|--------|--------|---------|---------------------|
+| **mod_tavg.r** | ✅ **Ready** | 5-15 seconds | GLS with AR(1) correlation |
+| **mod_range.r** | ✅ **Ready** | 5-15 seconds | GLS with AR(1) correlation |
+| **weather_simulated_100ys.r** | ⚠️ **Heavy** | **30-60 seconds** | 100-year simulation (36,500 days) |
+| **just_model/iter1.r** | ✅ **Ready** | 10-30 seconds | Mixed-effects modeling |
+| **just_model/iter2.r** | ❌ **Blocked** | **2-5 minutes** | Needs iter1.rdata; 75 parameter grid search |
+| **just_model/iter3.r** | ❌ **Blocked** | Unknown | Depends on iter2 results |
+| **iters/arima.r** | ❌ **Fails** | **1-3 minutes** | Missing make_weather_csv.r |
+| **iters/arima_v2.r** | ✅ **Ready** | 1-2 minutes | TBATS + ARIMA modeling |
+
+### Critical Performance Bottlenecks
+
+1. **iter8.r - Mixed Effects Modeling** 
+   - NLME logistic growth model: ~60 seconds
+   - GLS with variance modeling: ~30 seconds
+   - **Total estimated runtime: 90+ seconds**
+
+2. **iter9.r - Data Pipeline**
+   - Processes 35 Excel files via merge_transform_weather()
+   - **Heavy I/O operations: 30-60 seconds**
+
+3. **just_model/iter2.r - Hyperparameter Optimization**
+   - Grid search: 5×5×3 = 75 parameter combinations
+   - Cross-validation with multiple time splits
+   - **Estimated runtime: 2-5 minutes**
+
+4. **weather_simulated_100ys.r - Long-term Simulation**
+   - 100-year weather simulation (36,500 days)
+   - **Monte Carlo computation: 30-60 seconds**
+
+### Data Dependencies & Error Sources
+
+| Issue | Affected Scripts | Resolution Required |
+|-------|------------------|-------------------|
+| **Hungarian column names** | iter2.r | Fix `Mérő` → `Mero`, `Dátum` → `Datum` |
+| **Missing iter1.rdata** | just_model/iter2.r, iter3.r | Run iter1.r first |
+| **Missing make_weather_csv.r** | iters/arima.r, alter_plot.r | Create or locate missing script |
+| **Path issues** | Multiple scripts | Excel files expect local paths vs extdata/ |
+
+### Execution Workflow Recommendations
+
+**Fast Scripts (< 10 seconds):**
+- load_stuff.r → iter3.r → iter5_rezsicsokk.r → iter6_mods.r → iter7.r
+
+**Moderate Scripts (10-60 seconds):**
+- mod_tavg.r, mod_range.r → just_model/iter1.r → iters/arima_v2.r
+
+**Heavy Scripts (> 1 minute):**
+- iter8.r → iter9.r → just_model/iter2.r → weather_simulated_100ys.r
+
+**Blocked Scripts (require fixes):**
+- iter2.r (column names) → iter4.r (dependencies) → just_model/iter2.r,iter3.r → iters/arima.r
+
 ## Main Iteration Scripts (`iter*.r`)
 
 ### iter2.r - Foundation Script

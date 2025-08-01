@@ -6,11 +6,11 @@ library(lubridate)
 library(ggplot2)
 library(nlme)
 
-gaz <- read_excel("gaz.xlsx", range = "A4:D1343")
+gaz <- read_excel(here::here("inst", "extdata", "gaz.xlsx"), range = "A4:D1343")
 colnames(gaz) <- c("date", "day_in_yr", "nextdate", "rate")
 #View(gaz)
 
-weather <- read_csv("weather.csv")
+weather <- read_csv(here::here("inst", "weather.csv"))
 
 data <- left_join( weather, gaz, by = "date")
 
@@ -121,7 +121,7 @@ plot(preds_def$time,
      type='l')
 
 
-load("pred_rate.rdata")
+load(here::here("data", "pred_rate.rdata"))
 
 get_lp <- function(t) {
   if (t <= -6.7) { 
