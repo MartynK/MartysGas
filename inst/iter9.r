@@ -13,7 +13,7 @@ merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
                          output_file = "data/meteostat_data.Rdata")
 
 
-act_year <- 2024
+act_year <- 2025
 # which is current 'ywint'
 act_ywint <- obs_days %>%
   ungroup() %>%
@@ -249,7 +249,7 @@ obs_days_complete %>%
   scale_y_continuous(limits = c(-.1, 2))
 
 # start of the heating season
-ywint_lim <- 31
+ywint_lim <- 32
 
 date_limits <-
   obs_days_complete %>%
