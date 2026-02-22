@@ -1,7 +1,7 @@
 pkgs <- c(
   "dplyr", "ggplot2", "lubridate", "nlme", "splines",
   "readxl", "readr", "ggpubr", "forecast", "quantreg",
-  "lme4", "boot", "splines2", "here"
+  "lme4", "boot", "splines2", "here", "foreach", "doParallel"
 )
 
 invisible(lapply(pkgs, function(p) {

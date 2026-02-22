@@ -23,27 +23,36 @@
 #' merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
 #'                          output_file = "data/meteostat_data.Rdata")
 merge_transform_weather <- function(data_dir, gaz_dir, output_file,
-                                    act_year = 2024) {
+                                    act_year = 2025) {
   
   # Load required libraries
   library(dplyr)
   library(readxl)
   library(lubridate)
   library(here)
+  library(foreach)
+  library(doParallel)
 
-  get_avg_temp <- function( df = obs_days, var = "tavg", var_time = "Date",
-                            xmin, xmax) {
-    f <- approxfun( df[var_time][[1]], df[var][[1]])
-    integrated <- NA
-    try(silent = FALSE, {
-      integrated <- integrate( f, subdivisions = 100000,
-                               #stop.on.error = FALSE,
-                               rel.tol = 0.1,
-                               lower = xmin, upper = xmax)$value
-    })
+  # Setup parallel backend
+  n_cores <- parallel::detectCores()
+  n_workers <- min(6, max(1, n_cores - 2))  # Default 6, max ncores()-2
+  cl <- makeCluster(n_workers)
+  registerDoParallel(cl)
+  on.exit(stopCluster(cl), add = TRUE)  # Ensure cleanup
+
+  get_avg_temp <- function(xmin, xmax, f = temp_fun) {
+    integrated <- NA_real_
+    try({
+      integrated <- integrate(
+        f,
+        lower = xmin,
+        upper = xmax
+        # let subdivisions & rel.tol default; they're usually fine
+      )$value
+    }, silent = TRUE)
     
-    duration <- difftime( xmax, xmin, units = "secs")
-    return( integrated / as.numeric(duration))
+    duration <- difftime(xmax, xmin, units = "secs")
+    return(integrated / as.numeric(duration))
   }
   
   # List all files in the data directory
@@ -54,17 +63,23 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     stop("Data directory is empty.")
   } else {
     
-    # Loop through files and merge them
-    for (i in seq_along(fil)) {
-      
+    # Loop through files and merge them in parallel
+    meteostat_weather <- foreach(i = seq_along(fil),
+                                 .combine = 'rbind',
+                                 .packages = c('readxl', 'here')) %dopar% {
       file_path <- here::here(data_dir, fil[i])
-      
-      if (i == 1) {
-        meteostat_weather <- read_excel(file_path)
-      } else {
-        meteostat_weather <- rbind(meteostat_weather, read_excel(file_path))
+      temp_df <- read_excel(file_path)
+
+      # Standardize first column name to "date"
+      if (names(temp_df)[1] != "date") {
+        names(temp_df)[1] <- "date"
       }
+
+      temp_df
     }
+
+    message("Loaded ", nrow(meteostat_weather), " weather records from ",
+            length(fil), " files using ", n_workers, " workers")
   } 
   
   # Data transformations
@@ -74,7 +89,9 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     # omitting superfuous predictors
     dplyr::select(!(c("prcp","snow","wdir","wspd","wpgt","pres","tsun"))) %>%
     ungroup %>%
-    rename(Date = date) %>% 
+    rename(Date = date) %>%
+    # Ensure Date is unique before approxfun uses it
+    distinct(Date, .keep_all = TRUE) %>%
     mutate(
       Date = as_datetime(Date),
       range = tmax - tmin,
@@ -159,7 +176,7 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     # crop data after last reading
     filter( Date < last_reading)
     
-  
+  obs_hours <- NA
   # this took about 3 min with a for loop :)
   # simulating temps per hour according to a simple sinus
   obs_hours <- expand.grid( hours_dat = 0:23,
@@ -167,7 +184,8 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
                              temp = 0) %>%
     mutate(tim = Date + hours(hours_dat),
            id = 1:n()) %>%
-    left_join( ., meteostat_weather, by = "Date") %>%
+    left_join(., meteostat_weather, by = "Date",
+              relationship = "many-to-many") %>%
     mutate( tavg =  tmin + ( sin( (hours_dat-6)/12 * pi) + 1) * range / 2,
             Date = tim) %>%
     select(!(c(tim))) %>%
@@ -181,13 +199,18 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     # crop data after last reading
     filter( Date < last_reading)
   
+  temp_fun <- with(obs_hours, approxfun(Date, tavg, rule = 2))
+  
   obs_readings <- obs_readings %>%
     rowwise() %>%
-    mutate(tavg_obs = get_avg_temp(xmin = datelag,
-                                   xmax = Date,
-                                   df = obs_hours, var = "tavg", 
-                                   var_time = "Date"),
-           heat_off = ifelse( tavg_obs > 17, "off", "on"))
+    mutate(
+      tavg_obs = if_else(
+        is.na(datelag),
+        NA_real_,
+        get_avg_temp(datelag, Date)
+      ),
+      heat_off = ifelse(is.na(tavg_obs) | tavg_obs > 17, "off", "on")
+    )
   
 
   # Save the processed data
