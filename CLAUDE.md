@@ -6,18 +6,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MartysGas is an R package for analyzing household gas consumption patterns and weather data correlations. The project evolved through a series of iterative scripts (`iter*.r`) exploring different modeling approaches to predict gas usage based on temperature data. It is very haphazard, similar steps have been attempted multiple times, and basic data transformations are run and rerun, so the "workflow" is nonexistent. Categorizing and building a logical train of thought in the steps within is the most important thing.
 
+The ultimate goal is to determine optimal heating strategies (gas boiler vs. heat pump) through detailed consumption modeling and weather-based forecasting.
+
 ## Package Structure
 
-- **R/**: Core utility functions exported by the package
-- **inst/**: Main analysis scripts, iteration experiments, and data files
-  - `iter*.r`: Sequential analysis iterations with increasing complexity
-  - `function/load_stuff.r`: Central loader that attaches packages, sources R/ functions, and loads saved data
-  - `extdata/`: Raw data files (gas readings, weather data)
-  - `iters/`: Experimental scripts with ARIMA and alternative approaches
-  - `just_model/`: Standalone modeling attempts
-- **data/**: Processed datasets in RData format
-- **tests/**: Unit tests using testthat framework
-- **vignettes/**: Package documentation and examples
+```
+MartysGas/
+├── R/                           # 8 source files, 12+ exported functions
+├── inst/
+│   ├── function/
+│   │   ├── load_stuff.r         # Central loader (packages + R/ + data)
+│   │   └── backend/             # Pre-computed GLS models & simulations
+│   ├── iter*.r                  # Main analysis iterations (iter2-iter9)
+│   ├── just_model/              # Standalone modeling (tropical year, optimization)
+│   ├── iters/                   # ARIMA/time series experiments
+│   ├── archive/                 # Old experiments
+│   ├── extdata/
+│   │   ├── gaz.xlsx             # Gas meter readings (manual, irregular)
+│   │   ├── meteostat_data/      # 37+ weather data Excel files (1995-present)
+│   │   ├── secrets/             # API key for Meteostat RapidAPI
+│   │   └── roadmap.md           # Object lifecycle documentation
+│   └── Report_heatneed/         # Quarto report (.qmd + children)
+├── data/                        # 13 .Rdata files (~100 MB total)
+├── tests/testthat/              # testthat tests
+├── vignettes/                   # Package documentation
+├── DESCRIPTION                  # Package: MartysGas v0.0.1
+└── NAMESPACE                    # 11 exports (meteostat_query_daily pending)
+```
 
 ## R Style Guide Options
 
@@ -107,45 +122,30 @@ MartysGas is an R package for analyzing household gas consumption patterns and w
 -  Use meaningful error messages
 -  Use try()/tryCatch() for operations that might fail, especially if nested within a loop
 
-## Key considerations
+## Key Considerations
 
 - The main goal is to produce 'Reports' from input data.
 - 'Reports' mainly consist of text, figures and tables, in a .qmd ecology.
 - I prefer a structure where figures and tables are named and referenced in the Report.
-- Reports are generated using Quarto from `inst/report/report.qmd`
+- Reports are generated using Quarto from `inst/Report_heatneed/report.qmd`
 
 ### When to Refactor Large Files
   - Break files when they exceed ~400-500 lines
-  - Split at logical section boundaries (e.g., after Primary Endpoint,
-  before ROM analyses)
-  - Each child document should end with `save.image(file =
-  here::here("inst", "report", "state_after_childX.RData"))`
-  - Next child document should start with `load(here::here("inst", "report",
-   "state_after_childX.RData"))`
+  - Split at logical section boundaries (e.g., after Primary Endpoint, before ROM analyses)
+  - Each child document should end with `save.image(file = here::here("inst", "report", "state_after_childX.RData"))`
+  - Next child document should start with `load(here::here("inst", "report", "state_after_childX.RData"))`
 
-## R packages for Ubuntu
+## Cross-Environment R Libraries (Ubuntu/WSL)
 
-Ubuntu Compiled R Package Libraries for Cross-Environment Compatibility:
-To enable full statistical analysis capabilities including mixed-effects
-modeling and advanced plotting, Ubuntu-compiled R packages are stored at
-@/mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/_Libraries/_Ubuntu_packages/
-and accessed via .libPaths() configuration. This directory contains over
-200 compiled R packages including critical dependencies that require
-system-level compilation (nloptr, lme4, effects, emmeans, zoo,
-RcppArmadillo) which cannot be easily installed in restricted environments
- due to cmake and system library requirements. The Ubuntu packages are
-fully compatible across similar Linux environments and can be activated by
- prepending the library path: .libPaths(c('/mnt/c/Users/mrkma/OneDrive/DKM
-/Stats_R/R/_Libraries/_Ubuntu_packages', .libPaths())) before loading
-packages. This approach enables complete statistical workflows including
-lme4::lmer() mixed-effects models, emmeans::emmeans() contrasts,
-zoo::na.locf() last-observation-carried-forward imputation, and
-effects::predictorEffects() visualization without requiring admin
-privileges or system-level package compilation. The compiled libraries
-maintain full functionality across different computational environments
-while preserving reproducibility and ensuring consistent statistical
-analysis capabilities between development scripts (inst/iter1.r,
-inst/iter2.r) and production report generation workflows.
+Pre-compiled R packages for Ubuntu/WSL2 are at:
+`/mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/_Libraries/_Ubuntu_packages/`
+
+Activate with:
+```r
+.libPaths(c('/mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/_Libraries/_Ubuntu_packages', .libPaths()))
+```
+
+This enables lme4, emmeans, zoo, effects, RcppArmadillo, and 200+ other compiled packages without system-level compilation.
 
 
 ## Development Workflow
@@ -201,32 +201,52 @@ The project follows an iterative exploration pattern:
 - Gas data: `inst/extdata/gaz.xlsx` → processed in iter scripts → various `.rdata` files
 - Models: Trained models saved in `data/` directory for reuse across scripts (consolidated from `inst/function/backend/`)
 
-### Exported Functions
+### Exported Functions (NAMESPACE)
 
-Core utilities (see NAMESPACE):
-- `create_meter_fun()`, `approx_rate()`: Gas meter data processing
-- `simulate_weather()`, `simulate_corr_resids()`: Weather simulation
-- `maketsum()`, `Maketsum()`: Temperature sum calculations
+Currently exported (11 functions):
+- `create_meter_fun()`, `approx_rate()`, `get_avg_temp()`: Gas meter interpolation & rate calculation
+- `capture_plot()`: Capture base R plots as objects
+- `simulate_weather()`, `simulate_corr_resids()`: Monte Carlo weather simulation
+- `maketsum()`, `Maketsum()`: Temperature sum calculations (scalar & vectorized)
 - `load_all_Rdata()`: Batch data loading
-- `merge_transform_weather()`: Weather data preprocessing
+- `yday_inverse()`: Day-of-year to date conversion
+- `merge_transform_weather()`: Full weather + gas data pipeline
 
-### Script Chronology & Current Status (Updated 2025-08-01)
+**Not yet exported** (needs `devtools::document()`):
+- `meteostat_query_daily()`: Queries Meteostat RapidAPI for daily weather data, saves to Excel
 
-The `iter*.r` scripts represent the project evolution:
-- **iter2**: ✅ **Fixed & Working** - Basic data cleaning, temp sums, linear models (fixed column name issues)
-- **iter3**: ⚠️ **Untested** - Weather exploration and CSV processing
-- **iter4**: ✅ **Working** - Sinusoidal temperature modeling, prediction grids
-- **iter5**: ⚠️ **Untested** - Heating season forecasting with scenarios  
-- **iter6**: ⚠️ **Untested** - Advanced modeling with transformations
-- **iter7-8**: ⚠️ **Heavy computation** - Linear/GLS models and residual analysis
-- **iter9**: ⚠️ **Heavy I/O** - Integration of updated weather data (35 Excel files)
+### Script Chronology & Status (Updated 2026-03-25)
 
-**Specialized Scripts:**
-- **just_model/iter1.r**: ✅ **Working** - Tropical year modeling, mixed effects
-- **just_model/iter2.r**: ⚠️ **Heavy** - Grid search optimization (>2 minutes)
-- **iters/arima.r**: ✅ **Mostly Fixed** - TBATS/ARIMA time series (minor remaining issues)
+**Main iteration scripts** (`inst/iter*.r`):
 
-Each script builds on previous work while exploring new modeling approaches.
+| Script | Status | Runtime | Purpose |
+|--------|--------|---------|---------|
+| iter2.r | ✅ Working | ~10s | Foundation: gas data cleaning, temp sums, spline models |
+| iter3.r | ⚠️ Untested | ~4s | Weather CSV exploration, smoothing |
+| iter4.r | ✅ Working | ~5s | Sinusoidal hourly temperature model |
+| iter5_rezsicsokk.r | ⚠️ Untested | ~4s | Heating season forecasting, multi-scenario |
+| iter6_mods.r | ⚠️ Untested | moderate | GAM modeling, transformed variables, season indicators |
+| iter6_mods_bu.r | ⚠️ Untested | moderate | Backup: alternative spline approach (df=2) |
+| iter7.r | ⚠️ Untested | moderate | GLS with AR(1), residual autocorrelation analysis |
+| iter8.r | ⚠️ Heavy | >90s | Cumulative heat need, NLME logistic growth |
+| iter9.r | ⚠️ Heavy | >30s | Merges 37 Excel weather files, interpolation |
+
+**Standalone modeling** (`inst/just_model/`):
+
+| Script | Status | Runtime | Purpose |
+|--------|--------|---------|---------|
+| iter1.r | ✅ Working | 10-30s | Tropical year modeling, mixed effects by winter year |
+| iter2.r | ⚠️ Heavy | >2 min | Grid search optimization (75 combos), cross-validation |
+| iter3.r | ❌ Blocked | - | Production predictions (depends on iter2 results) |
+| new model.r | ⚠️ Untested | - | Alternative tropical year with different reference date |
+
+**Time series experiments** (`inst/iters/`):
+
+| Script | Status | Runtime | Purpose |
+|--------|--------|---------|---------|
+| arima.r | ❌ Fails | 1-3 min | TBATS/ARIMA (internal NAs in time series) |
+| arima_v2.r | ⚠️ Untested | 1-2 min | Refined ARIMA, 30-replication ensemble |
+| alter_plot.r | ⚠️ Untested | 1-2 min | ARIMA duplicate/backup |
 
 ## Modeling Approach Categories
 
@@ -293,43 +313,42 @@ The codebase demonstrates several distinct analytical approaches:
 - **Simulation-based inference**: Monte Carlo methods for uncertainty quantification
 - **Interpolation/approximation**: Handling irregular data and rate calculations
 
-## Recent Fixes & Data Management (2025-08-01)
+## Change Log
 
-### ✅ Major Issues Resolved
+### 2026-02 — Automated Weather Querying
+- Added `R/meteostat_query.r` with `meteostat_query_daily()` for RapidAPI weather data pulls
+- API key stored in `inst/extdata/secrets/meteostat_api_key.txt`
+- New weather file: `meteostat_12843_20250218_20260218.xlsx`
+- Regenerated `data/meteostat_data.Rdata` with latest data (Feb 2026)
+- **NAMESPACE not yet updated** — run `devtools::document()` to export `meteostat_query_daily`
 
-1. **Data File Organization**: 
-   - Consolidated all `.rdata` files to `data/` directory
-   - Removed duplicates from `inst/` subdirectories
-   - Fixed inconsistent save/load patterns across scripts
+### 2025-08 — Major Cleanup
+- Consolidated all `.rdata` files to `data/` directory, removed duplicates from `inst/`
+- Fixed column name mismatches in iter2.r (`temps_xtra$tavg` → `$temp`, `tsum` → `tact`)
+- Fixed iters/arima.r data source, just_model/iter1.r save path
+- Standardized variable naming across scripts
 
-2. **Script Dependencies Fixed**:
-   - **iter2.r**: Fixed column name mismatches (`temps_xtra$tavg` → `temps_xtra$temp`, `tsum` → `tact`)
-   - **iters/arima.r**: Fixed missing dependency (`make_weather_csv.r` exists in project root)
-   - **iters/arima.r**: Changed data source to `iter6_mods.rdata` for complete variable set
-   - **just_model/iter1.r**: Updated save path to use `data/` directory
+## Data Loading Hierarchy
 
-3. **Variable Name Consistency**:
-   - Standardized temperature variable references across scripts
-   - Fixed plotting and modeling variable mismatches
-   - Ensured data pipeline integrity
+```
+load_stuff.r
+├── Packages: dplyr, ggplot2, lubridate, nlme, splines, readxl, readr,
+│             ggpubr, forecast, quantreg, lme4, boot, splines2, here,
+│             foreach, doParallel
+├── source_all_files(here::here("R"))    # All 8 R/ source files
+├── load("data/meteostat_data.Rdata")    # Core weather + gas data
+└── load_all_Rdata("inst/function/backend/")  # mod_tavg, mod_range
+```
 
-### 🔧 Current Architecture Notes
+**Script-specific data loads**:
+- `tempsextra.rdata` — hourly temps (767 KB)
+- `iter6_mods.rdata` — comprehensive modeling outputs (44 MB)
+- `iter1.rdata` — tropical year models (4.5 MB)
+- `pred_rate.rdata`, `pred_temps.rdata` — prediction grids
 
-**Data Loading Hierarchy**:
-- `load_stuff.r` → Core packages + `meteostat_data.Rdata`
-- Script-specific loads: `tempsextra.rdata`, `iter6_mods.rdata`, `iter1.rdata`
-- Backend models: `mod_tavg.Rdata`, `mod_range.Rdata`, `weather_simulated.Rdata`
+## Known Issues
 
-**Working Scripts** (tested successfully):
-- `inst/function/load_stuff.r`
-- `inst/iter2.r` 
-- `inst/iter4.r`
-- `inst/just_model/iter1.r`
-
-**Heavy Computational Scripts** (>1 minute runtime):
-- `inst/just_model/iter2.r` (grid search optimization)
-- `inst/iter8.r` (NLME modeling)
-- `inst/iter9.r` (35 Excel file processing)
-
-**Partially Fixed Scripts**:
-- `inst/iters/arima.r` (runs ~98%, minor variable scoping issue remains)
+- `iters/arima.r`: Fails due to internal NAs in the time series object
+- `just_model/iter3.r`: Blocked, depends on iter2.r results
+- `NAMESPACE` out of sync: `meteostat_query_daily` has `@export` tag but needs `devtools::document()`
+- `inst/function/wrangling.r` exists but is empty
