@@ -24,9 +24,11 @@ source_all_files(here::here("R"))
 #                          gaz_dir  = "inst/extdata/gaz.xlsx",
 #                          output_file = "data/meteostat_data.Rdata")
 
-load( here::here("data","meteostat_data.Rdata")) 
-load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow suff's output
+# Core data: weather + gas observations + interpolated objects
+load(here::here("data", "meteostat_data.Rdata"))
 
-#source( here::here( "inst", "function", "wrangling.r"))
-
-
+# Weather models: GLS temperature models + 100-year simulation
+# (produced by iter2_weather_models.r)
+if (file.exists(here::here("data", "weather_models.Rdata"))) {
+  load(here::here("data", "weather_models.Rdata"))
+}

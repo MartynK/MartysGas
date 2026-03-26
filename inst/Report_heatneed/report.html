@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.3.450">
+<meta name="generator" content="quarto-1.8.25">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -25,22 +25,51 @@ ul.task-list li input[type="checkbox"] {
 
 
 <script src="report_files/libs/clipboard/clipboard.min.js"></script>
-<script src="report_files/libs/quarto-html/quarto.js"></script>
+<script src="report_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="report_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="report_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="report_files/libs/quarto-html/popper.min.js"></script>
 <script src="report_files/libs/quarto-html/tippy.umd.min.js"></script>
 <script src="report_files/libs/quarto-html/anchor.min.js"></script>
 <link href="report_files/libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="report_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="report_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link href="report_files/libs/bootstrap/bootstrap-9e3ffae467580fdb927a41352e75a2e0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
-  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 </head>
 
-<body>
+<body class="quarto-light">
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
 <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
@@ -54,8 +83,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#estimating-total-energy-needs-left-on-a-given-day" id="toc-estimating-total-energy-needs-left-on-a-given-day" class="nav-link" data-scroll-target="#estimating-total-energy-needs-left-on-a-given-day">Estimating total energy needs left on a given day</a></li>
   <li><a href="#figuring-in-actual-energy-usage" id="toc-figuring-in-actual-energy-usage" class="nav-link" data-scroll-target="#figuring-in-actual-energy-usage">Figuring in actual energy usage</a>
   <ul class="collapse">
-  <li><a href="#first-approximation-based-on-data-from-a-given-season" id="toc-first-approximation-based-on-data-from-a-given-season" class="nav-link" data-scroll-target="#first-approximation-based-on-data-from-a-given-season">First approximation based on data from a given season</a></li>
-  <li><a href="#second-approximation---using-data-from-previous-years" id="toc-second-approximation---using-data-from-previous-years" class="nav-link" data-scroll-target="#second-approximation---using-data-from-previous-years">Second approximation - using data from previous years</a></li>
+  <li><a href="#seasonal-efficiency-tracking" id="toc-seasonal-efficiency-tracking" class="nav-link" data-scroll-target="#seasonal-efficiency-tracking">Seasonal efficiency tracking</a></li>
   </ul></li>
   <li><a href="#remarks" id="toc-remarks" class="nav-link" data-scroll-target="#remarks">Remarks</a>
   <ul class="collapse">
@@ -87,14 +115,10 @@ ul.task-list li input[type="checkbox"] {
   </div>
   
 
+
 </header>
 
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Error in integrate(f, subdivisions = 1e+05, rel.tol = 0.1, lower = xmin,  : 
-  a limit is NA or NaN</code></pre>
-</div>
-</div>
+
 <section id="introduction" class="level1">
 <h1>Introduction</h1>
 <p>&nbsp;&nbsp;</p>
@@ -107,10 +131,14 @@ ul.task-list li input[type="checkbox"] {
 <h1>Description of the data</h1>
 <p>&nbsp;<br>
 Meteorological data from 1995 onward is available for free at <a href="https://meteostat.net/en/place/hu/budapest-xix-kerulet?s=12843&amp;t=2024-01-03/2024-01-10">meteostat</a> for my location in Budapest, Hungary (Europe) in excel. I haven’t figured out the API, and I am downloading a new excel periodically and concatenating them in R.</p>
-<p>I have also read my gas meter regularly from 2018 onwards. To make it interesting, I don’t read the meter regularly, so the times between readings are between 2.4 hours and 163 days so the quality of the observations are not ideal.</p>
+<p>I have also read my gas meter regularly from 2018 onwards. To make it interesting, I don’t read the meter regularly, so the times between readings are between 2.4 hours and 188 days so the quality of the observations are not ideal.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid" width="384"></p>
+<div>
+<figure class="figure">
+<p><img src="report_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="384"></p>
+</figure>
+</div>
 </div>
 </div>
 <div style="page-break-after: always;"></div>
@@ -121,10 +149,18 @@ Meteorological data from 1995 onward is available for free at <a href="https://m
 <p>Therefore to predict the energy needs left in a given (heating) season, we should make a prediction about the expected amount of energy required until the end of the season.</p>
 <p>Thankfully things seem to be straightforward if we assume that the inside temperature of the building should be constant (it’s not but bear with me). Assume 20°C (68°F). Heat loss is linear to the difference in temperature between the inside and outside temperatures <a href="http://hyperphysics.phy-astr.gsu.edu/hbase/thermo/heatloss.html">link</a>.</p>
 <p>Therefore when the outside temperature is 16°C we would need 4x the power to heat the building than if it would be 19°C. Also, this amount of energy needed for these two days is the same that we would need for heating for 3 days if it were <span class="math inline">\(20 - 5/3 = 18.33\)</span> degrees outside. In other words for a given heating season, we would add up the “missing degrees” until 20 for every day the outside temperature was less than 20°.</p>
-<p>We have a pesky issue with missing data (sometimes every 2nd or 3rd date has results in the 90’s). The below step is quite rudimentary, doing linear interpolation between existing datapoints. This would capture the high autocorrelation between dates but it ain’t perfect.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+<div id="fig-heatneed-per-year" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-heatneed-per-year-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-heatneed-per-year-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-heatneed-per-year-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Cumulative heating energy needs by year
+</figcaption>
+</figure>
+</div>
 </div>
 </div>
 <p>I personally like this approach very much, but of course we are neglecting:</p>
@@ -133,39 +169,49 @@ Meteorological data from 1995 onward is available for free at <a href="https://m
 <li>the building’s heat capacity, eg. after a hot summer’s day, it takes about 3 days for the walls to cool</li>
 </ul>
 <p>For simplicity and to retain my sanity, lets also assume that at each timepoint (day), the distribution of ‘energy needs’ is normal.</p>
-<div class="callout callout-style-default callout-important callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Important
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The evolution of the energy needs <em>may</em> be thought of as logistic growth but I’m not exploring that at this time.</p>
-</div>
-</div>
-<p>I’d like to fit a <em>linear model</em> for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I’d opt for a <em>generalized least squares</em> model with an <em>exponential variance structure</em> (meaning that the residuals are understood to have a larger variance when more days have elapsed). Its not perfect, since at the end of the season (june, july) not much heating is going on and therefore variance tends to taper off there.</p>
+<p>I’d like to fit a <em>linear model</em> for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I’d opt for a <em>generalized least squares</em> model with an <em>exponential variance structure</em> (meaning that the residuals are understood to have a larger variance when more days have elapsed).</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="672"></p>
+<div id="fig-gls-effects" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-gls-effects-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-gls-effects-1.png" class="img-fluid figure-img" width="672">
 </div>
-<div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-14-2.png" class="img-fluid" width="672"></p>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-gls-effects-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: GLS model effects
+</figcaption>
+</figure>
 </div>
 </div>
-<p>I could not, for the life of me got the <em>prediction intervals</em> correctly out of the model which would expand over the course of the elapsed days. One potential solution would be the package <em>AICcmodavg</em> but it threw an error (possibly because I used <em>tibbles</em> for my data; solution is trivial, but not going to implement it).</p>
+</div>
 <p>As a “petty craftsman” kind of approach, I calculated standard deviations for all days and then fitted a <em>linear model</em> over it with a natural spline term capturing the evolution of standard deviation in heating needs over the course of a season.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid" width="672"></p>
+<div id="fig-sd-effects" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-sd-effects-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-sd-effects-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sd-effects-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Observed SD evolution over the season
+</figcaption>
+</figure>
+</div>
 </div>
 </div>
 <p>Now we have a mean and a variance for the cumulative heating energy needs on any given day (at my location)! I can then assign a z-score for each result through the years.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid" width="672"></p>
+<div id="fig-cumulative-with-bands" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-cumulative-with-bands-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-cumulative-with-bands-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-cumulative-with-bands-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Cumulative heating needs with mean and 95% CI bands
+</figcaption>
+</figure>
+</div>
 </div>
 </div>
 </section>
@@ -175,87 +221,91 @@ Important
 <p>I start with investigating how do energy need values observed on a given day <em>correlate</em> to the <em>total</em> energy need for a given season. Specifically, what was the correlation between the z-scores of a given day vs.&nbsp;the last day in a season.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid" width="672"></p>
+<div id="fig-correlation-evolution" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-correlation-evolution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-correlation-evolution-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-correlation-evolution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Correlation between mid-season z-score and end-of-season z-score
+</figcaption>
+</figure>
 </div>
 </div>
-<p>The spike around day 150 is due to leap years (probably); didn’t bother to fix it, as it didn’t bother the results much. I fit a linear model with a spline for this relationship, like before.</p>
-<div class="cell">
-<div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid" width="672"></p>
 </div>
-</div>
-<p>Sooo…. we are searching for the <em>Y</em> normal distribution, which is correlated by <em>c</em> with the normal distribution <em>X</em>, then</p>
-<p><span class="math inline">\(mean(Y)|(X=x) = c * x\)</span></p>
-<p><span class="math inline">\(variance(Y)|(X=x) = (1 - c^2)*variance(Y)\)</span></p>
-<p>Lets fix day n the season as <em>173</em> and the cumulated energy need thus far as <em>1530</em> (beginning of January, 2024). I’m not a 100% that I’ve implemented the intermediate values the right way, but I am sure about the end state (at Day 365). Level of significance is at 5% (hence the 1.96x SD part).</p>
-<div class="cell">
-<div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid" width="672"></p>
-</div>
-</div>
-<p>I can therefore construct an interval estimate of how much energy I still need to burn in this heating season (how much ‘coldness’ there will be before summer). I prefer to see the realized energy need as a percentage of what can be expected in total.</p>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 0.4749717</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 0.5681479</code></pre>
-</div>
-</div>
-<p>It seems that up until this point we have experienced 47-57% of our total energy need for heating this season.</p>
+<p>The spike around day 150 is due to leap years (probably); didn’t bother to fix it, as it didn’t bother the results much.</p>
 </section>
 <section id="figuring-in-actual-energy-usage" class="level1">
 <h1>Figuring in actual energy usage</h1>
-<section id="first-approximation-based-on-data-from-a-given-season" class="level2">
-<h2 class="anchored" data-anchor-id="first-approximation-based-on-data-from-a-given-season">First approximation based on data from a given season</h2>
-<p>I have everything I need to make predictions about the expected total amount of <em>gas</em> I need for the rest of the year. For each day, I make an interval prediction for the total energy requirement for the year, I calculate the remaining portion of this need, and I estimate the amount of gas I need for this portion, given that I used up <em>V</em> amount of gas for <em>Q</em> amount of heating.</p>
-<p>The method isn’t perfect. I seem to get reliable estimates around 1 month into winter. There are multiple potential reasons: - The house has a ton of heat capacity, and I don’t actually need to heat it if the mean temperature drops to ~19° for a day or two. This makes the realized ‘energy needs’ conservative in the autumn/spring. - I use the heat pump for heating sometimes when the temperature difference isn’t huge (and therefore the heat pump is crazy efficient). This inflates the estimated energy needs further when the temperature difference is low (autumn/summer).</p>
-<p>The resulting estimates are quite cool though.</p>
+<p>The key insight is that a linear budget makes no sense — winter months consume vastly more gas than summer. Instead we track the <strong>ratio of gas consumed to cumulative heating need</strong> (m³ per °C·day). If this ratio stays stable, we can predict total annual gas usage by combining it with the <em>conditional</em> total heat need forecast.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid" width="672"></p>
+<div id="fig-spent-vs-heatneed" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-spent-vs-heatneed-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-spent-vs-heatneed-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-spent-vs-heatneed-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Gas consumed vs.&nbsp;cumulative heat need (all years)
+</figcaption>
+</figure>
 </div>
 </div>
-<p>The width of the confidence interval is decreasing after a point too, I hope it reaches ‘0’ when the year is done.</p>
-</section>
-<section id="second-approximation---using-data-from-previous-years" class="level2">
-<h2 class="anchored" data-anchor-id="second-approximation---using-data-from-previous-years">Second approximation - using data from previous years</h2>
+</div>
+<section id="seasonal-efficiency-tracking" class="level2">
+<h2 class="anchored" data-anchor-id="seasonal-efficiency-tracking">Seasonal efficiency tracking</h2>
+<p>Rather than a flat daily budget, we track the <em>gas consumption efficiency</em> — how many m³ of gas per °C·day of heating need. This ratio should stay roughly stable over a season. If it climbs, we are over-heating; if it drops, we are under-heating (or the heat pump is picking up slack).</p>
+<p>The dashed grey lines show the predicted efficiency band for the remaining season, based on conditional forecasts of total heat need.</p>
 <div class="cell">
 <div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid" width="672"></p>
+<div id="fig-efficiency-dashboard" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-efficiency-dashboard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="report_files/figure-html/fig-efficiency-dashboard-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-efficiency-dashboard-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Gas efficiency ratio: current year vs.&nbsp;predicted band
+</figcaption>
+</figure>
 </div>
 </div>
-<div class="cell">
-<div class="cell-output-display">
-<p><img src="report_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid" width="672"></p>
 </div>
-</div>
+<p>The solid colored line shows actual gas usage efficiency (m³ per °C·day of heat need), colored by remaining gas budget. When the line stays within the grey dashed prediction bands, the budget is on track. If the line moves above the upper band, gas consumption is too aggressive relative to expected remaining heat need.</p>
 <div style="page-break-after: always;"></div>
 </section>
 </section>
 <section id="remarks" class="level1">
 <h1>Remarks</h1>
-<section id="md5-checksum-of-the-database-used" class="level3">
-<h3 class="anchored" data-anchor-id="md5-checksum-of-the-database-used">MD5 checksum of the database used</h3>
-</section>
 <section id="other-information-regarding-the-documents-compilation" class="level3">
 <h3 class="anchored" data-anchor-id="other-information-regarding-the-documents-compilation">Other information regarding the document’s compilation</h3>
-<p>Analyses were conducted using the R Statistical language (version 4.3.1; R Core Team, 2023) on Windows 10 x64 (build 19045), using the packages lubridate (version 1.9.3; Grolemund G, Wickham H, 2011), here (version 1.0.1; Müller K, 2020), nlme (version 3.1.164; Pinheiro J et al., 2023), ggplot2 (version 3.5.0; Wickham H, 2016), readxl (version 1.4.3; Wickham H, Bryan J, 2023) and dplyr (version 1.1.4; Wickham H et al., 2023).</p>
+<p>Analyses were conducted using the R Statistical language (version 4.5.2; R Core Team, 2025) on Windows 11 x64 (build 26200), using the packages iterators (version 1.0.14; Analytics R, Weston S, 2022), lme4 (version 1.1.38; Bates D et al., 2015), Matrix (version 1.7.4; Bates D et al., 2025), boot (version 1.3.32; Canty A, Ripley B, 2025), doParallel (version 1.0.17; Corporation M, Weston S, 2022), lubridate (version 1.9.5; Grolemund G, Wickham H, 2011), forecast (version 9.0.1; Hyndman R et al., 2026), ggpubr (version 0.6.2; Kassambara A, 2025), SparseM (version 1.84.2; Koenker R, 2024), quantreg (version 6.1; Koenker R, 2025), foreach (version 1.5.2; Microsoft, Weston S, 2022), here (version 1.0.2; Müller K, 2025), nlme (version 3.1.168; Pinheiro J et al., 2025), splines2 (version 0.5.4; Wang W, Yan J, 2025), ggplot2 (version 4.0.2; Wickham H, 2016), readxl (version 1.4.5; Wickham H, Bryan J, 2025), dplyr (version 1.2.0; Wickham H et al., 2026) and readr (version 2.1.6; Wickham H et al., 2025).</p>
 </section>
 <section id="references" class="level2">
 <h2 class="anchored" data-anchor-id="references">References</h2>
 <ul>
+<li>Analytics R, Weston S (2022). <em>iterators: Provides Iterator Construct</em>. doi:10.32614/CRAN.package.iterators <a href="https://doi.org/10.32614/CRAN.package.iterators" class="uri">https://doi.org/10.32614/CRAN.package.iterators</a>, R package version 1.0.14, <a href="https://CRAN.R-project.org/package=iterators" class="uri">https://CRAN.R-project.org/package=iterators</a>.</li>
+<li>Bates D, Mächler M, Bolker B, Walker S (2015). “Fitting Linear Mixed-Effects Models Using lme4.” <em>Journal of Statistical Software</em>, <em>67</em>(1), 1-48. doi:10.18637/jss.v067.i01 <a href="https://doi.org/10.18637/jss.v067.i01" class="uri">https://doi.org/10.18637/jss.v067.i01</a>.</li>
+<li>Bates D, Maechler M, Jagan M (2025). <em>Matrix: Sparse and Dense Matrix Classes and Methods</em>. doi:10.32614/CRAN.package.Matrix <a href="https://doi.org/10.32614/CRAN.package.Matrix" class="uri">https://doi.org/10.32614/CRAN.package.Matrix</a>, R package version 1.7-4, <a href="https://CRAN.R-project.org/package=Matrix" class="uri">https://CRAN.R-project.org/package=Matrix</a>.</li>
+<li>Canty A, Ripley B (2025). <em>boot: Bootstrap Functions</em>. doi:10.32614/CRAN.package.boot <a href="https://doi.org/10.32614/CRAN.package.boot" class="uri">https://doi.org/10.32614/CRAN.package.boot</a>, R package version 1.3-32, <a href="https://CRAN.R-project.org/package=boot" class="uri">https://CRAN.R-project.org/package=boot</a>. Davison A, Hinkley D (1997). <em>Bootstrap Methods and Their Applications</em>. Cambridge University Press, Cambridge. ISBN 0-521-57391-2, doi:10.1017/CBO9780511802843 <a href="https://doi.org/10.1017/CBO9780511802843" class="uri">https://doi.org/10.1017/CBO9780511802843</a>.</li>
+<li>Corporation M, Weston S (2022). <em>doParallel: Foreach Parallel Adaptor for the ‘parallel’ Package</em>. doi:10.32614/CRAN.package.doParallel <a href="https://doi.org/10.32614/CRAN.package.doParallel" class="uri">https://doi.org/10.32614/CRAN.package.doParallel</a>, R package version 1.0.17, <a href="https://CRAN.R-project.org/package=doParallel" class="uri">https://CRAN.R-project.org/package=doParallel</a>.</li>
 <li>Grolemund G, Wickham H (2011). “Dates and Times Made Easy with lubridate.” <em>Journal of Statistical Software</em>, <em>40</em>(3), 1-25. <a href="https://www.jstatsoft.org/v40/i03/" class="uri">https://www.jstatsoft.org/v40/i03/</a>.</li>
-<li>Müller K (2020). <em>here: A Simpler Way to Find Your Files</em>. R package version 1.0.1, <a href="https://CRAN.R-project.org/package=here" class="uri">https://CRAN.R-project.org/package=here</a>.</li>
-<li>Pinheiro J, Bates D, R Core Team (2023). <em>nlme: Linear and Nonlinear Mixed Effects Models</em>. R package version 3.1-164, <a href="https://CRAN.R-project.org/package=nlme" class="uri">https://CRAN.R-project.org/package=nlme</a>. Pinheiro JC, Bates DM (2000). <em>Mixed-Effects Models in S and S-PLUS</em>. Springer, New York. doi:10.1007/b98882 <a href="https://doi.org/10.1007/b98882" class="uri">https://doi.org/10.1007/b98882</a>.</li>
-<li>R Core Team (2023). <em>R: A Language and Environment for Statistical Computing</em>. R Foundation for Statistical Computing, Vienna, Austria. <a href="https://www.R-project.org/" class="uri">https://www.R-project.org/</a>.</li>
+<li>Hyndman R, Athanasopoulos G, Bergmeir C, Caceres G, Chhay L, O’Hara-Wild M, Petropoulos F, Razbash S, Wang E, Yasmeen F (2026). <em>forecast: Forecasting functions for time series and linear models</em>. doi:10.32614/CRAN.package.forecast <a href="https://doi.org/10.32614/CRAN.package.forecast" class="uri">https://doi.org/10.32614/CRAN.package.forecast</a>, R package version 9.0.1, <a href="https://pkg.robjhyndman.com/forecast/" class="uri">https://pkg.robjhyndman.com/forecast/</a>. Hyndman RJ, Khandakar Y (2008). “Automatic time series forecasting: the forecast package for R.” <em>Journal of Statistical Software</em>, <em>27</em>(3), 1-22. doi:10.18637/jss.v027.i03 <a href="https://doi.org/10.18637/jss.v027.i03" class="uri">https://doi.org/10.18637/jss.v027.i03</a>.</li>
+<li>Kassambara A (2025). <em>ggpubr: ‘ggplot2’ Based Publication Ready Plots</em>. doi:10.32614/CRAN.package.ggpubr <a href="https://doi.org/10.32614/CRAN.package.ggpubr" class="uri">https://doi.org/10.32614/CRAN.package.ggpubr</a>, R package version 0.6.2, <a href="https://CRAN.R-project.org/package=ggpubr" class="uri">https://CRAN.R-project.org/package=ggpubr</a>.</li>
+<li>Koenker R (2024). <em>SparseM: Sparse Linear Algebra</em>. doi:10.32614/CRAN.package.SparseM <a href="https://doi.org/10.32614/CRAN.package.SparseM" class="uri">https://doi.org/10.32614/CRAN.package.SparseM</a>, R package version 1.84-2, <a href="https://CRAN.R-project.org/package=SparseM" class="uri">https://CRAN.R-project.org/package=SparseM</a>.</li>
+<li>Koenker R (2025). <em>quantreg: Quantile Regression</em>. doi:10.32614/CRAN.package.quantreg <a href="https://doi.org/10.32614/CRAN.package.quantreg" class="uri">https://doi.org/10.32614/CRAN.package.quantreg</a>, R package version 6.1, <a href="https://CRAN.R-project.org/package=quantreg" class="uri">https://CRAN.R-project.org/package=quantreg</a>.</li>
+<li>Microsoft, Weston S (2022). <em>foreach: Provides Foreach Looping Construct</em>. doi:10.32614/CRAN.package.foreach <a href="https://doi.org/10.32614/CRAN.package.foreach" class="uri">https://doi.org/10.32614/CRAN.package.foreach</a>, R package version 1.5.2, <a href="https://CRAN.R-project.org/package=foreach" class="uri">https://CRAN.R-project.org/package=foreach</a>.</li>
+<li>Müller K (2025). <em>here: A Simpler Way to Find Your Files</em>. doi:10.32614/CRAN.package.here <a href="https://doi.org/10.32614/CRAN.package.here" class="uri">https://doi.org/10.32614/CRAN.package.here</a>, R package version 1.0.2, <a href="https://CRAN.R-project.org/package=here" class="uri">https://CRAN.R-project.org/package=here</a>.</li>
+<li>Pinheiro J, Bates D, R Core Team (2025). <em>nlme: Linear and Nonlinear Mixed Effects Models</em>. doi:10.32614/CRAN.package.nlme <a href="https://doi.org/10.32614/CRAN.package.nlme" class="uri">https://doi.org/10.32614/CRAN.package.nlme</a>, R package version 3.1-168, <a href="https://CRAN.R-project.org/package=nlme" class="uri">https://CRAN.R-project.org/package=nlme</a>. Pinheiro JC, Bates DM (2000). <em>Mixed-Effects Models in S and S-PLUS</em>. Springer, New York. doi:10.1007/b98882 <a href="https://doi.org/10.1007/b98882" class="uri">https://doi.org/10.1007/b98882</a>.</li>
+<li>R Core Team (2025). <em>R: A Language and Environment for Statistical Computing</em>. R Foundation for Statistical Computing, Vienna, Austria. <a href="https://www.R-project.org/" class="uri">https://www.R-project.org/</a>.</li>
+<li>Wang W, Yan J (2025). <em>splines2: Regression Spline Functions and Classes</em>. R package version 0.5.4, <a href="https://CRAN.R-project.org/package=splines2" class="uri">https://CRAN.R-project.org/package=splines2</a>. Wang W, Yan J (2021). “Shape-Restricted Regression Splines with R Package splines2.” <em>Journal of Data Science</em>, <em>19</em>(3), 498-517. doi:10.6339/21-JDS1020 <a href="https://doi.org/10.6339/21-JDS1020" class="uri">https://doi.org/10.6339/21-JDS1020</a>.</li>
 <li>Wickham H (2016). <em>ggplot2: Elegant Graphics for Data Analysis</em>. Springer-Verlag New York. ISBN 978-3-319-24277-4, <a href="https://ggplot2.tidyverse.org" class="uri">https://ggplot2.tidyverse.org</a>.</li>
-<li>Wickham H, Bryan J (2023). <em>readxl: Read Excel Files</em>. R package version 1.4.3, <a href="https://CRAN.R-project.org/package=readxl" class="uri">https://CRAN.R-project.org/package=readxl</a>.</li>
-<li>Wickham H, François R, Henry L, Müller K, Vaughan D (2023). <em>dplyr: A Grammar of Data Manipulation</em>. R package version 1.1.4, <a href="https://CRAN.R-project.org/package=dplyr" class="uri">https://CRAN.R-project.org/package=dplyr</a>.</li>
+<li>Wickham H, Bryan J (2025). <em>readxl: Read Excel Files</em>. doi:10.32614/CRAN.package.readxl <a href="https://doi.org/10.32614/CRAN.package.readxl" class="uri">https://doi.org/10.32614/CRAN.package.readxl</a>, R package version 1.4.5, <a href="https://CRAN.R-project.org/package=readxl" class="uri">https://CRAN.R-project.org/package=readxl</a>.</li>
+<li>Wickham H, François R, Henry L, Müller K, Vaughan D (2026). <em>dplyr: A Grammar of Data Manipulation</em>. doi:10.32614/CRAN.package.dplyr <a href="https://doi.org/10.32614/CRAN.package.dplyr" class="uri">https://doi.org/10.32614/CRAN.package.dplyr</a>, R package version 1.2.0, <a href="https://CRAN.R-project.org/package=dplyr" class="uri">https://CRAN.R-project.org/package=dplyr</a>.</li>
+<li>Wickham H, Hester J, Bryan J (2025). <em>readr: Read Rectangular Text Data</em>. doi:10.32614/CRAN.package.readr <a href="https://doi.org/10.32614/CRAN.package.readr" class="uri">https://doi.org/10.32614/CRAN.package.readr</a>, R package version 2.1.6, <a href="https://CRAN.R-project.org/package=readr" class="uri">https://CRAN.R-project.org/package=readr</a>.</li>
 </ul>
 <section id="time-of-compilation" class="level3">
 <h3 class="anchored" data-anchor-id="time-of-compilation">Time of compilation</h3>
-<p>2024-05-01 12:56:39.970234</p>
+<p>2026-03-26 05:59:28.567428</p>
 </section>
 </section>
 </section>
@@ -263,43 +313,58 @@ Important
 </main>
 <!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
-window.document.addEventListener("DOMContentLoaded", function (event) {
-  const toggleBodyColorMode = (bsSheetEl) => {
-    const mode = bsSheetEl.getAttribute("data-mode");
-    const bodyEl = window.document.querySelector("body");
-    if (mode === "dark") {
-      bodyEl.classList.add("quarto-dark");
-      bodyEl.classList.remove("quarto-light");
-    } else {
-      bodyEl.classList.add("quarto-light");
-      bodyEl.classList.remove("quarto-dark");
-    }
-  }
-  const toggleBodyColorPrimary = () => {
-    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
-    if (bsSheetEl) {
-      toggleBodyColorMode(bsSheetEl);
-    }
-  }
-  toggleBodyColorPrimary();  
-  const icon = "";
-  const anchorJS = new window.AnchorJS();
-  anchorJS.options = {
-    placement: 'right',
-    icon: icon
-  };
-  anchorJS.add('.anchored');
-  const isCodeAnnotation = (el) => {
-    for (const clz of el.classList) {
-      if (clz.startsWith('code-annotation-')) {                     
-        return true;
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
       }
+      return false;
     }
-    return false;
-  }
-  const clipboard = new window.ClipboardJS('.code-copy-button', {
-    text: function(trigger) {
-      const codeEl = trigger.previousElementSibling.cloneNode(true);
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
       for (const childEl of codeEl.children) {
         if (isCodeAnnotation(childEl)) {
           childEl.remove();
@@ -307,195 +372,348 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       }
       return codeEl.innerText;
     }
-  });
-  clipboard.on('success', function(e) {
-    // button target
-    const button = e.trigger;
-    // don't keep focus
-    button.blur();
-    // flash "checked"
-    button.classList.add('code-copy-button-checked');
-    var currentTitle = button.getAttribute("title");
-    button.setAttribute("title", "Copied!");
-    let tooltip;
-    if (window.bootstrap) {
-      button.setAttribute("data-bs-toggle", "tooltip");
-      button.setAttribute("data-bs-placement", "left");
-      button.setAttribute("data-bs-title", "Copied!");
-      tooltip = new bootstrap.Tooltip(button, 
-        { trigger: "manual", 
-          customClass: "code-copy-button-tooltip",
-          offset: [0, -8]});
-      tooltip.show();    
-    }
-    setTimeout(function() {
-      if (tooltip) {
-        tooltip.hide();
-        button.removeAttribute("data-bs-title");
-        button.removeAttribute("data-bs-toggle");
-        button.removeAttribute("data-bs-placement");
-      }
-      button.setAttribute("title", currentTitle);
-      button.classList.remove('code-copy-button-checked');
-    }, 1000);
-    // clear code selection
-    e.clearSelection();
-  });
-  function tippyHover(el, contentFn) {
-    const config = {
-      allowHTML: true,
-      content: contentFn,
-      maxWidth: 500,
-      delay: 100,
-      arrow: false,
-      appendTo: function(el) {
-          return el.parentElement;
-      },
-      interactive: true,
-      interactiveBorder: 10,
-      theme: 'quarto',
-      placement: 'bottom-start'
-    };
-    window.tippy(el, config); 
-  }
-  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
-  for (var i=0; i<noterefs.length; i++) {
-    const ref = noterefs[i];
-    tippyHover(ref, function() {
-      // use id or data attribute instead here
-      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
-      try { href = new URL(href).hash; } catch {}
-      const id = href.replace(/^#\/?/, "");
-      const note = window.document.getElementById(id);
-      return note.innerHTML;
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
     });
-  }
-      let selectedAnnoteEl;
-      const selectorForAnnotation = ( cell, annotation) => {
-        let cellAttr = 'data-code-cell="' + cell + '"';
-        let lineAttr = 'data-code-annotation="' +  annotation + '"';
-        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
-        return selector;
-      }
-      const selectCodeLines = (annoteEl) => {
-        const doc = window.document;
-        const targetCell = annoteEl.getAttribute("data-target-cell");
-        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
-        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
-        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
-        const lineIds = lines.map((line) => {
-          return targetCell + "-" + line;
-        })
-        let top = null;
-        let height = null;
-        let parent = null;
-        if (lineIds.length > 0) {
-            //compute the position of the single el (top and bottom and make a div)
-            const el = window.document.getElementById(lineIds[0]);
-            top = el.offsetTop;
-            height = el.offsetHeight;
-            parent = el.parentElement.parentElement;
-          if (lineIds.length > 1) {
-            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
-            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
-            height = bottom - top;
-          }
-          if (top !== null && height !== null && parent !== null) {
-            // cook up a div (if necessary) and position it 
-            let div = window.document.getElementById("code-annotation-line-highlight");
-            if (div === null) {
-              div = window.document.createElement("div");
-              div.setAttribute("id", "code-annotation-line-highlight");
-              div.style.position = 'absolute';
-              parent.appendChild(div);
-            }
-            div.style.top = top - 2 + "px";
-            div.style.height = height + 4 + "px";
-            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
-            if (gutterDiv === null) {
-              gutterDiv = window.document.createElement("div");
-              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
-              gutterDiv.style.position = 'absolute';
-              const codeCell = window.document.getElementById(targetCell);
-              const gutter = codeCell.querySelector('.code-annotation-gutter');
-              gutter.appendChild(gutterDiv);
-            }
-            gutterDiv.style.top = top - 2 + "px";
-            gutterDiv.style.height = height + 4 + "px";
-          }
-          selectedAnnoteEl = annoteEl;
-        }
-      };
-      const unselectCodeLines = () => {
-        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
-        elementsIds.forEach((elId) => {
-          const div = window.document.getElementById(elId);
-          if (div) {
-            div.remove();
-          }
-        });
-        selectedAnnoteEl = undefined;
-      };
-      // Attach click handler to the DT
-      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
-      for (const annoteDlNode of annoteDls) {
-        annoteDlNode.addEventListener('click', (event) => {
-          const clickedEl = event.target;
-          if (clickedEl !== selectedAnnoteEl) {
-            unselectCodeLines();
-            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
-            if (activeEl) {
-              activeEl.classList.remove('code-annotation-active');
-            }
-            selectCodeLines(clickedEl);
-            clickedEl.classList.add('code-annotation-active');
-          } else {
-            // Unselect the line
-            unselectCodeLines();
-            clickedEl.classList.remove('code-annotation-active');
-          }
-        });
-      }
-  const findCites = (el) => {
-    const parentEl = el.parentElement;
-    if (parentEl) {
-      const cites = parentEl.dataset.cites;
-      if (cites) {
-        return {
-          el,
-          cites: cites.split(' ')
-        };
-      } else {
-        return findCites(el.parentElement)
-      }
-    } else {
-      return undefined;
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
     }
-  };
-  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
-  for (var i=0; i<bibliorefs.length; i++) {
-    const ref = bibliorefs[i];
-    const citeInfo = findCites(ref);
-    if (citeInfo) {
-      tippyHover(citeInfo.el, function() {
-        var popup = window.document.createElement('div');
-        citeInfo.cites.forEach(function(cite) {
-          var citeDiv = window.document.createElement('div');
-          citeDiv.classList.add('hanging-indent');
-          citeDiv.classList.add('csl-entry');
-          var biblioDiv = window.document.getElementById('ref-' + cite);
-          if (biblioDiv) {
-            citeDiv.innerHTML = biblioDiv.innerHTML;
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
           }
-          popup.appendChild(citeDiv);
-        });
-        return popup.innerHTML;
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
       });
     }
-  }
-});
-</script>
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
 </div> <!-- /content -->
+
 
 
 

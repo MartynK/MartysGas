@@ -2,15 +2,20 @@ Package: MartysGas
 Type: Package
 Title: Gas Consumption Analysis
 Version: 0.0.1
-Authors@R: person("Maintainer", "Person", email="maintainer@example.com", role="aut")
+Authors@R: person("Maintainer", "Person", email="maintainer@example.com", role=c("aut", "cre"))
 Description: Utilities and analysis functions for gas and weather data.
 License: MIT
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3
 Depends: R (>= 3.5.0)
 Imports:
+    dplyr,
+    here,
+    lubridate,
+    mvtnorm,
+    readxl,
     splines,
     stats,
     foreach,

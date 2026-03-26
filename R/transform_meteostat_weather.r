@@ -175,7 +175,62 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
                                  Spent / max(Spent, na.rm = TRUE))) %>%
     # crop data after last reading
     filter( Date < last_reading)
-    
+
+  # ---- Complete-date interpolation ----
+  # obs_days may have gaps (missing calendar days) because
+  # meteostat data can skip dates.  We build a gapless
+  # daily sequence and fill in NAs via linear interpolation
+  # so downstream cumulative / rolling calculations work.
+  complete_dates <- data.frame(
+    Date = seq(from = min(obs_days$Date),
+               to   = max(obs_days$Date),
+               by   = "day")
+  )
+
+  # Left-join keeps every calendar day; missing rows get NA
+  obs_days_complete <- left_join(
+    complete_dates, obs_days, by = "Date"
+  )
+
+  # Column-by-column linear interpolation of NAs
+  for (i in 2:ncol(obs_days_complete)) {
+
+    dat_act <- obs_days_complete$Date
+
+    # ywint is a factor -- must go numeric for approxfun
+    if (colnames(obs_days_complete)[i] == "ywint") {
+      val <- as.numeric(obs_days_complete[, i])
+    } else {
+      val <- obs_days_complete[, i]
+    }
+
+    # Need at least 2 non-NA points for interpolation
+    valid_idx <- !is.na(val)
+    if (sum(valid_idx) > 1) {
+      fun. <- approxfun(
+        x = dat_act[valid_idx],
+        y = val[valid_idx],
+        rule = 2
+      )
+      # Only overwrite the NAs; keep original values intact
+      obs_days_complete[, i] <- ifelse(
+        is.na(val), fun.(dat_act), val
+      )
+    }
+  }
+
+  # Restore ywint back to factor after numeric interpolation
+  if ("ywint" %in% colnames(obs_days_complete)) {
+    obs_days_complete$ywint <- as.factor(
+      round(obs_days_complete$ywint)
+    )
+  }
+
+  message("Interpolated ", nrow(obs_days_complete),
+          " complete daily records ",
+          "(", nrow(obs_days_complete) - nrow(obs_days),
+          " days filled)")
+
   obs_hours <- NA
   # this took about 3 min with a for loop :)
   # simulating temps per hour according to a simple sinus
@@ -214,8 +269,8 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
   
 
   # Save the processed data
-  save(meteostat_weather, obs_hours, obs_readings, 
-       obs_days, data, jelleggorb,
+  save(meteostat_weather, obs_hours, obs_readings,
+       obs_days, obs_days_complete, jelleggorb,
        get_approx_meter, get_approx_rate, get_avg_temp,
        file = here::here(output_file))
 }

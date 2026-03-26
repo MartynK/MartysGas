@@ -17,27 +17,19 @@ execute:
 ---
 
 ```{r setup}
+# Load packages, functions, and core data
+source(here::here("inst", "function", "load_stuff.r"))
 
-#fil <- here::here("inst","extdata","Iris.xls")
-
-
-# doing stuff so we get 'merge_transform_weather' function
-source( here::here( "inst", "function", "load_stuff.r"))
-
-merge_transform_weather( data_dir = "inst/extdata/meteostat_data",
-                         gaz_dir  = "inst/extdata/gaz.xlsx",
-                         output_file = "data/meteostat_data.Rdata")
-
-# does not impact runtime; loading compiled .rdata bit again
-source( here::here( "inst", "function", "load_stuff.r"))
-
-source( here::here( "inst", "function", "wrangling.r"))
-
-# source_all_files(here::here("inst","example_quarto","backend")) # Run slow stuff; 
-##recommend running separately
-
-load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow suff's output
-
+# Load analysis outputs (produced by iter4-iter6 pipeline)
+if (file.exists(here::here("data", "cumulative_heat_models.Rdata"))) {
+  load(here::here("data", "cumulative_heat_models.Rdata"))
+}
+if (file.exists(here::here("data", "cumulative_heat_predictions.Rdata"))) {
+  load(here::here("data", "cumulative_heat_predictions.Rdata"))
+}
+if (file.exists(here::here("data", "decision_snapshot.Rdata"))) {
+  load(here::here("data", "decision_snapshot.Rdata"))
+}
 ```
 
 ```{r, child = here::here("inst", "Report_heatneed", "child1_preamble.qmd")}
@@ -52,12 +44,6 @@ load_all_Rdata(directory=here::here("inst","function","backend")) # Load slow su
 
 # Remarks
 
-### MD5 checksum of the database used
-
-```{r, comment='', results='asis'}
-#tools::md5sum(fil) # %>% as.character # Uncomment reporting path is not desirable
-```
-
 ### Other information regarding the document's compilation
 
 ```{r, comment='', results='asis'}
@@ -67,6 +53,5 @@ sessionInfo() %>% report::report() %>% cat()
 ### Time of compilation
 
 ```{r last_chunk, results='asis'}
-Sys.time() %>% as.character %>% cat
-save.image(file = here::here("inst","Report_heatneed","end_state.rdata"))
+Sys.time() %>% as.character() %>% cat()
 ```

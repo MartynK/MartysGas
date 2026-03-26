@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MartysGas is an R package for analyzing household gas consumption patterns and weather data correlations. The project evolved through a series of iterative scripts (`iter*.r`) exploring different modeling approaches to predict gas usage based on temperature data. It is very haphazard, similar steps have been attempted multiple times, and basic data transformations are run and rerun, so the "workflow" is nonexistent. Categorizing and building a logical train of thought in the steps within is the most important thing.
+MartysGas is an R package for tracking household gas consumption against the Hungarian subsidized gas quota ("rezsicsökkentés": 1,729 m³/year at ~102 HUF/m³ vs. ~767 HUF/m³ penalty rate). The quota year runs Aug 1 – Jul 31. The user pays flat-rate (átalány) with a physical meter reading ~Jan 5.
 
-The ultimate goal is to determine optimal heating strategies (gas boiler vs. heat pump) through detailed consumption modeling and weather-based forecasting.
+The pipeline produces a **decision tool**: "Given current consumption and weather uncertainty, should I amp up, hold steady, or dial down gas usage this week?"
 
 ## Package Structure
 
@@ -16,22 +16,52 @@ MartysGas/
 ├── inst/
 │   ├── function/
 │   │   ├── load_stuff.r         # Central loader (packages + R/ + data)
-│   │   └── backend/             # Pre-computed GLS models & simulations
-│   ├── iter*.r                  # Main analysis iterations (iter2-iter9)
-│   ├── just_model/              # Standalone modeling (tropical year, optimization)
-│   ├── iters/                   # ARIMA/time series experiments
-│   ├── archive/                 # Old experiments
+│   │   └── backend/             # Legacy GLS model scripts (reference)
+│   ├── iter1_data_prep.r        # Step 1: Wrangle weather + gas data
+│   ├── iter2_weather_models.r   # Step 2: GLS backend + 100yr simulation
+│   ├── iter3_consumption_curves.r # Step 3: GAM rate curves (descriptive)
+│   ├── iter4_cumulative_heat_model.r # Step 4: Degree-day models + z-scores
+│   ├── iter5_conditional_prediction.r # Step 5: Forecasting + efficiency ratio
+│   ├── iter6_decision_tool.r    # Step 6: "Amp up / hold / dial down"
+│   ├── weathermodels/           # Alternative weather approaches (standalone)
+│   │   ├── tropical_year.r      # Tropical year LME (runnable)
+│   │   └── arima_v2_reference.r # ARIMA experiments (reference)
+│   ├── misc/                    # Archived old experiments
 │   ├── extdata/
 │   │   ├── gaz.xlsx             # Gas meter readings (manual, irregular)
 │   │   ├── meteostat_data/      # 37+ weather data Excel files (1995-present)
-│   │   ├── secrets/             # API key for Meteostat RapidAPI
-│   │   └── roadmap.md           # Object lifecycle documentation
-│   └── Report_heatneed/         # Quarto report (.qmd + children)
-├── data/                        # 13 .Rdata files (~100 MB total)
+│   │   └── secrets/             # API key for Meteostat RapidAPI
+│   └── Report_heatneed/        # Quarto report (.qmd + children + dashboard)
+├── data/                        # Pipeline outputs (~25 MB)
 ├── tests/testthat/              # testthat tests
 ├── vignettes/                   # Package documentation
 ├── DESCRIPTION                  # Package: MartysGas v0.0.1
 └── NAMESPACE                    # 11 exports (meteostat_query_daily pending)
+```
+
+## Analysis Pipeline
+
+```
+iter1_data_prep.r        → data/meteostat_data.Rdata
+iter2_weather_models.r   → data/weather_models.Rdata
+iter3_consumption_curves.r → data/consumption_curves.Rdata
+iter4_cumulative_heat_model.r → data/cumulative_heat_models.Rdata
+iter5_conditional_prediction.r → data/cumulative_heat_predictions.Rdata
+iter6_decision_tool.r    → console recommendation + data/decision_snapshot.Rdata
+Report_heatneed/report.qmd → loads all .Rdata, renders figures + dashboard
+```
+
+**When new data arrives**: Run iter1 (re-wrangles everything). Then re-run iter2–iter6 as needed.
+
+## Billing Context (Hungarian Gas Quota)
+
+```r
+QUOTA_M3       <- 1729       # Annual subsidized volume (~63,645 MJ)
+PRICE_CHEAP    <- 102        # HUF/m³ below quota
+PRICE_PENALTY  <- 767        # HUF/m³ above quota (~7.5× multiplier)
+# Quota year: Aug 1 – Jul 31 (ywint definition is correct)
+# Meter reading: ~Jan 5 (átalány true-up)
+# Pro-rata daily quota: ~4.74 m³/day (flat, not jelleggörbe)
 ```
 
 ## R Style Guide Options
@@ -215,38 +245,27 @@ Currently exported (11 functions):
 **Not yet exported** (needs `devtools::document()`):
 - `meteostat_query_daily()`: Queries Meteostat RapidAPI for daily weather data, saves to Excel
 
-### Script Chronology & Status (Updated 2026-03-25)
+### Script Pipeline (Updated 2026-03-25)
 
-**Main iteration scripts** (`inst/iter*.r`):
+**Main pipeline** (`inst/iter*.r`) — run sequentially:
 
-| Script | Status | Runtime | Purpose |
-|--------|--------|---------|---------|
-| iter2.r | ✅ Working | ~10s | Foundation: gas data cleaning, temp sums, spline models |
-| iter3.r | ⚠️ Untested | ~4s | Weather CSV exploration, smoothing |
-| iter4.r | ✅ Working | ~5s | Sinusoidal hourly temperature model |
-| iter5_rezsicsokk.r | ⚠️ Untested | ~4s | Heating season forecasting, multi-scenario |
-| iter6_mods.r | ⚠️ Untested | moderate | GAM modeling, transformed variables, season indicators |
-| iter6_mods_bu.r | ⚠️ Untested | moderate | Backup: alternative spline approach (df=2) |
-| iter7.r | ⚠️ Untested | moderate | GLS with AR(1), residual autocorrelation analysis |
-| iter8.r | ⚠️ Heavy | >90s | Cumulative heat need, NLME logistic growth |
-| iter9.r | ⚠️ Heavy | >30s | Merges 37 Excel weather files, interpolation |
+| Script | Lines | Runtime | Purpose |
+|--------|-------|---------|---------|
+| iter1_data_prep.r | 80 | ~30s | Wrangle weather + gas data → meteostat_data.Rdata |
+| iter2_weather_models.r | 166 | ~60s | GLS temp models + 100yr simulation → weather_models.Rdata |
+| iter3_consumption_curves.r | 256 | ~10s | GAM rate curves (descriptive) → consumption_curves.Rdata |
+| iter4_cumulative_heat_model.r | 351 | ~120s | Degree-day models + z-scores → cumulative_heat_models.Rdata |
+| iter5_conditional_prediction.r | 368 | ~30s | Forecasting + efficiency → cumulative_heat_predictions.Rdata |
+| iter6_decision_tool.r | 387 | <10s | Decision: amp up / hold / dial down → decision_snapshot.Rdata |
 
-**Standalone modeling** (`inst/just_model/`):
+**Alternative weather models** (`inst/weathermodels/`):
 
-| Script | Status | Runtime | Purpose |
-|--------|--------|---------|---------|
-| iter1.r | ✅ Working | 10-30s | Tropical year modeling, mixed effects by winter year |
-| iter2.r | ⚠️ Heavy | >2 min | Grid search optimization (75 combos), cross-validation |
-| iter3.r | ❌ Blocked | - | Production predictions (depends on iter2 results) |
-| new model.r | ⚠️ Untested | - | Alternative tropical year with different reference date |
+| Script | Lines | Purpose |
+|--------|-------|---------|
+| tropical_year.r | 153 | Runnable standalone: tropical year LME → tropical_year.Rdata |
+| arima_v2_reference.r | 145 | Reference only: ARIMA/TBATS experiments |
 
-**Time series experiments** (`inst/iters/`):
-
-| Script | Status | Runtime | Purpose |
-|--------|--------|---------|---------|
-| arima.r | ❌ Fails | 1-3 min | TBATS/ARIMA (internal NAs in time series) |
-| arima_v2.r | ⚠️ Untested | 1-2 min | Refined ARIMA, 30-replication ensemble |
-| alter_plot.r | ⚠️ Untested | 1-2 min | ARIMA duplicate/backup |
+**Archived scripts**: `inst/misc/` — old iterations, experiments, superseded approaches
 
 ## Modeling Approach Categories
 
@@ -315,18 +334,25 @@ The codebase demonstrates several distinct analytical approaches:
 
 ## Change Log
 
+### 2026-03 — Major Refactoring
+- **New pipeline**: 6 numbered scripts (iter1 through iter6) replacing 15+ scattered iteration files
+- **Fixed "double LOCF"**: Complete-date interpolation now in `merge_transform_weather()`, not duplicated across iter8/iter9/child2
+- **Fixed bug**: Removed undefined `data` variable from `save()` in transform_meteostat_weather.r
+- **Decision tool** (iter6): Prints weekly recommendation based on quota status and weather uncertainty
+- **Report slimmed**: child2.qmd from ~835 lines to ~170 (loads pre-computed state, no inline modeling)
+- **Archived**: 20+ old scripts to `inst/misc/`, stale data files to `data/archive/`
+- **weathermodels/**: Tropical year LME as runnable standalone, ARIMA as reference
+- **Billing context documented**: Hungarian gas quota (1,729 m³, Aug 1 – Jul 31, átalány)
+- **Data reduced**: ~100 MB → ~25 MB (targeted `save()` instead of `save.image()`)
+
 ### 2026-02 — Automated Weather Querying
 - Added `R/meteostat_query.r` with `meteostat_query_daily()` for RapidAPI weather data pulls
 - API key stored in `inst/extdata/secrets/meteostat_api_key.txt`
-- New weather file: `meteostat_12843_20250218_20260218.xlsx`
 - Regenerated `data/meteostat_data.Rdata` with latest data (Feb 2026)
-- **NAMESPACE not yet updated** — run `devtools::document()` to export `meteostat_query_daily`
 
 ### 2025-08 — Major Cleanup
 - Consolidated all `.rdata` files to `data/` directory, removed duplicates from `inst/`
-- Fixed column name mismatches in iter2.r (`temps_xtra$tavg` → `$temp`, `tsum` → `tact`)
-- Fixed iters/arima.r data source, just_model/iter1.r save path
-- Standardized variable naming across scripts
+- Fixed column name mismatches, standardized variable naming across scripts
 
 ## Data Loading Hierarchy
 
@@ -335,20 +361,22 @@ load_stuff.r
 ├── Packages: dplyr, ggplot2, lubridate, nlme, splines, readxl, readr,
 │             ggpubr, forecast, quantreg, lme4, boot, splines2, here,
 │             foreach, doParallel
-├── source_all_files(here::here("R"))    # All 8 R/ source files
-├── load("data/meteostat_data.Rdata")    # Core weather + gas data
-└── load_all_Rdata("inst/function/backend/")  # mod_tavg, mod_range
+├── source_all_files(here::here("R"))       # All 8 R/ source files
+├── load("data/meteostat_data.Rdata")       # Core weather + gas data
+└── load("data/weather_models.Rdata")       # GLS models + simulation (if exists)
 ```
 
-**Script-specific data loads**:
-- `tempsextra.rdata` — hourly temps (767 KB)
-- `iter6_mods.rdata` — comprehensive modeling outputs (44 MB)
-- `iter1.rdata` — tropical year models (4.5 MB)
-- `pred_rate.rdata`, `pred_temps.rdata` — prediction grids
+**Pipeline .Rdata chain** (each script loads its predecessor's output):
+- `meteostat_data.Rdata` — weather, gas readings, obs_days_complete (produced by iter1)
+- `weather_models.Rdata` — mod_tavg, mod_range, weather_simulated (produced by iter2)
+- `consumption_curves.Rdata` — GAM model + figures (produced by iter3)
+- `cumulative_heat_models.Rdata` — GLS + SD + z-scores (produced by iter4)
+- `cumulative_heat_predictions.Rdata` — forecasts + efficiency (produced by iter5)
+- `decision_snapshot.Rdata` — current recommendation (produced by iter6)
 
 ## Known Issues
 
-- `iters/arima.r`: Fails due to internal NAs in the time series object
-- `just_model/iter3.r`: Blocked, depends on iter2.r results
 - `NAMESPACE` out of sync: `meteostat_query_daily` has `@export` tag but needs `devtools::document()`
-- `inst/function/wrangling.r` exists but is empty
+- Pipeline not yet validated end-to-end (iter1 through iter6 need to be run sequentially to generate .Rdata files)
+- Old `data/iter6_mods.rdata` (44 MB) and individual model files still present; will be superseded when pipeline runs
+- NLME logistic model in iter4 is commented out by default (may be slow >500s)
