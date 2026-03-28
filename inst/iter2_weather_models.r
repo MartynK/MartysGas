@@ -162,8 +162,8 @@ message(
 )
 message(
   "  tavg range: [",
-  round(min(weather_simulated$tavg), 1), ", ",
-  round(max(weather_simulated$tavg), 1), "]"
+  round(min(weather_simulated$pred_tavg), 1), ", ",
+  round(max(weather_simulated$pred_tavg), 1), "]"
 )
 
 # -- Total runtime --

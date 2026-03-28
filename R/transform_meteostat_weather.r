@@ -83,10 +83,11 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
   } 
   
   # Data transformations
+  # Calendar-year basis: year + yday (lubridate handles leap years)
   meteostat_weather <- meteostat_weather %>%
     group_by(date) %>%
     slice_tail(n = 1) %>%
-    # omitting superfuous predictors
+    # omitting superfluous predictors
     dplyr::select(!(c("prcp","snow","wdir","wspd","wpgt","pres","tsun"))) %>%
     ungroup %>%
     rename(Date = date) %>%
@@ -97,46 +98,25 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
       range = tmax - tmin,
       day_in_year = yday(Date),
       year = year(Date),
-      ywint = as.factor(year(Date - 213 * 3600 * 24)),
-      ablak = ifelse(Date > as.Date("2020-11-25"), 1, 0),
-      day_in_wint = ifelse(day_in_year < 213, 
-                           day_in_year + 365 - 213,
-                           day_in_year - 213)) %>%
+      ablak = ifelse(Date > as.Date("2020-11-25"), 1, 0)
+    ) %>%
     filter(!is.na(tmin),!is.na(tmax),!is.na(tavg))
 
-  # jelleggörb. based on MVM's graph
-  jelleggorb <- data.frame(
-    month = 1:12,
-    amount = c(
-      336.0,  287.8,  229.9,
-      114.2,  12.9,   1.6,
-      1.6,    1.6,    32.2,
-      147.9,  233.1,  334.4))
-  
-  yday_august1st <- function(year.) {
-    x <- as_date("2000-08-01")
-    year(x) <- year.
-    return(yday(x))
-  }
-  
-  obs_readings <- read_excel(here::here(gaz_dir), 
+  obs_readings <- read_excel(here::here(gaz_dir),
                              sheet = "Mero_rendetlen") %>%
-    # 213 day in year == august 1st
-    rename( Value = Mero, 
-            Date = Datum, 
-            Gas = Gaz, 
+    rename( Value = Mero,
+            Date = Datum,
+            Gas = Gaz,
             Day = Nap) %>%
     mutate( Date = as_datetime(Date),
             datelag = lag(Date),
             datemiddle = Date + as.duration(interval(Date , datelag))/2,
-            ywint = ifelse(  yday(datemiddle) < yday_august1st(year(Date)), 
-                             year( datemiddle)-1, 
-                             year( datemiddle)) %>% as.factor
-            ,datenum = interval(min(Date), Date) %>% 
-              as.duration() %>% 
+            year = year(datemiddle),
+            datenum = interval(min(Date), Date) %>%
+              as.duration() %>%
               as.numeric("days")
     ) %>%
-    filter(Day!=0) 
+    filter(Day != 0, Value > 0)
   
   # extract last date to truncate result
   last_reading <- obs_readings %>% slice_tail(n=1) %>% pull(Date)
@@ -168,7 +148,7 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
   obs_days <- meteostat_weather %>%
     mutate(Meter = get_approx_meter(Date),
            Rate = get_approx_rate(Date)*3600*24) %>%
-    group_by(ywint) %>%
+    group_by(year) %>%
     mutate( Spent = Meter - min(Meter, na.rm = TRUE),
             Spent_perc = ifelse( year(Date) == act_year,
                                  Spent / 1730,
@@ -196,13 +176,7 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
   for (i in 2:ncol(obs_days_complete)) {
 
     dat_act <- obs_days_complete$Date
-
-    # ywint is a factor -- must go numeric for approxfun
-    if (colnames(obs_days_complete)[i] == "ywint") {
-      val <- as.numeric(obs_days_complete[, i])
-    } else {
-      val <- obs_days_complete[, i]
-    }
+    val <- obs_days_complete[, i]
 
     # Need at least 2 non-NA points for interpolation
     valid_idx <- !is.na(val)
@@ -219,12 +193,9 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     }
   }
 
-  # Restore ywint back to factor after numeric interpolation
-  if ("ywint" %in% colnames(obs_days_complete)) {
-    obs_days_complete$ywint <- as.factor(
-      round(obs_days_complete$ywint)
-    )
-  }
+  # Restore year and day_in_year from Date (safer than interpolating them)
+  obs_days_complete$year <- year(obs_days_complete$Date)
+  obs_days_complete$day_in_year <- yday(obs_days_complete$Date)
 
   message("Interpolated ", nrow(obs_days_complete),
           " complete daily records ",
@@ -246,14 +217,14 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
     select(!(c(tim))) %>%
     mutate(Meter = get_approx_meter(Date),
            Rate = get_approx_rate(Date)*3600*24) %>%
-    group_by(ywint) %>%
+    group_by(year) %>%
     mutate( Spent = Meter - min(Meter, na.rm = TRUE),
             Spent_perc = ifelse( year(Date) == act_year,
                                  Spent / 1730,
                                  Spent / max(Spent, na.rm = TRUE))) %>%
     # crop data after last reading
     filter( Date < last_reading)
-  
+
   temp_fun <- with(obs_hours, approxfun(Date, tavg, rule = 2))
   
   obs_readings <- obs_readings %>%
@@ -270,7 +241,7 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
 
   # Save the processed data
   save(meteostat_weather, obs_hours, obs_readings,
-       obs_days, obs_days_complete, jelleggorb,
+       obs_days, obs_days_complete,
        get_approx_meter, get_approx_rate, get_avg_temp,
        file = here::here(output_file))
 }

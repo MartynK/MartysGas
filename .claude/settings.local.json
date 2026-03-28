@@ -57,7 +57,16 @@
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"cat\\(system.file\\(package=''rmarkdown''\\), ''\\\\n''\\); cat\\(system.file\\(package=''knitr''\\), ''\\\\n''\\)\")",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \":*)",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/tmp_check2.r)",
-      "Bash(rm inst/tmp_check2.r)"
+      "Bash(rm inst/tmp_check2.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''data/weather_models.Rdata''\\); cat\\(''tavg NAs:'', sum\\(is.na\\(weather_simulated[[''tavg'']]\\)\\), ''/'', nrow\\(weather_simulated\\), ''\\\\n''\\); cat\\(''pred_tavg NAs:'', sum\\(is.na\\(weather_simulated[[''pred_tavg'']]\\)\\), ''/'', nrow\\(weather_simulated\\), ''\\\\n''\\); cat\\(''colnames:'', paste\\(colnames\\(weather_simulated\\), collapse='', ''\\), ''\\\\n''\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"sheets <- readxl::excel_sheets\\(here::here\\(''inst'',''extdata'',''gaz.xlsx''\\)\\); cat\\(''Sheets:'', paste\\(sheets, collapse='', ''\\), ''\\\\n''\\); for\\(s in sheets\\) { d <- readxl::read_excel\\(here::here\\(''inst'',''extdata'',''gaz.xlsx''\\), sheet=s\\); cat\\(s, '':'', nrow\\(d\\), ''rows x'', ncol\\(d\\), ''cols |'', paste\\(head\\(colnames\\(d\\),6\\), collapse='', ''\\), ''\\\\n''\\) }\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"cat\\(paste\\(readxl::excel_sheets\\(here::here\\(''inst'',''extdata'',''gaz.xlsx''\\)\\), collapse=''\\\\n''\\)\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"d <- readxl::read_excel\\(here::here\\(''inst'',''extdata'',''gaz.xlsx''\\), sheet=''Mero_rendetlen''\\); cat\\(''Rows:'', nrow\\(d\\), ''\\\\nCols:'', paste\\(colnames\\(d\\), collapse='', ''\\), ''\\\\n''\\); print\\(head\\(d, 5\\)\\); cat\\(''\\\\n--- Tail ---\\\\n''\\); print\\(tail\\(d, 5\\)\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_fix_excel.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"library\\(readxl\\); d <- read_excel\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/inst/extdata/gaz.xlsx'', sheet=''Mero_rendetlen''\\); print\\(tail\\(d, 3\\)\\); cat\\(''Cols:'', paste\\(colnames\\(d\\), collapse='', ''\\), ''\\\\n''\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_add_reading.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/weather_models.Rdata''\\); cat\\(''Cols:'', paste\\(colnames\\(weather_simulated\\), collapse='', ''\\), ''\\\\n''\\); cat\\(''Rows:'', nrow\\(weather_simulated\\), ''\\\\n''\\); print\\(head\\(weather_simulated, 3\\)\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_predictions.Rdata''\\); cat\\(''CONF_LEV:'', CONF_LEV, ''\\\\n''\\)\")"
     ],
     "deny": []
   }

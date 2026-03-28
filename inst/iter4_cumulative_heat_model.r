@@ -29,7 +29,7 @@ ACT_YEAR <- 2025
 
 # obs_days_complete is already available from meteostat_data.
 # It has interpolated gaps and includes Meter, Rate, Spent,
-# day_in_wint, ywint etc.  We just need to add tavg_capped
+# day_in_year, year etc.  We just need to add tavg_capped
 # and the cumulative heating need column.
 
 obs_days_complete <- obs_days_complete %>%
@@ -42,21 +42,23 @@ obs_days_complete <- obs_days_complete %>%
   )
 
 # Sequential loop: accumulate (20 - tavg_capped) within each
-# heating season.  When day_in_wint resets (new season), the
-# cumulative sum resets to zero.
+# calendar year.  When the year changes, the cumulative sum
+# resets to zero.  This gives a curve that starts steep in
+# January (peak heating), slows through spring, flattens in
+# summer, and picks up again in autumn.
 message("Computing cumulative heating need...")
 pb <- txtProgressBar(style = 3)
 for (i in 2:nrow(obs_days_complete)) {
-  if (obs_days_complete$day_in_wint[i] >=
-      obs_days_complete$day_in_wint[i - 1]) {
-    # Same season: accumulate
+  if (obs_days_complete$year[i] ==
+      obs_days_complete$year[i - 1]) {
+    # Same year: accumulate
     obs_days_complete$tavg_low_cumul[i] <-
-      obs_days_complete$tavg_low_cumul[i - 1] -
-      obs_days_complete$tavg_capped[i] + 20
+      obs_days_complete$tavg_low_cumul[i - 1] +
+      (20 - obs_days_complete$tavg_capped[i])
   } else {
-    # New season: reset
+    # New year: reset
     obs_days_complete$tavg_low_cumul[i] <-
-      obs_days_complete$tavg_capped[i] - 20
+      20 - obs_days_complete$tavg_capped[i]
   }
   setTxtProgressBar(pb, i / nrow(obs_days_complete))
 }
@@ -67,24 +69,10 @@ close(pb)
 # 3. Clean edge cases
 # ============================================================
 
-# Restore ywint as factor (was numeric for interpolation)
-obs_days_complete <- obs_days_complete %>%
-  mutate(ywint = as.factor(ywint))
-
-# First observed year is incomplete -- cumulative is wrong
+# First observed year is likely incomplete — drop it
+first_year <- min(obs_days_complete$year, na.rm = TRUE)
 obs_days_complete$tavg_low_cumul[
-  obs_days_complete$ywint == 1
-] <- NA
-
-# Mid-winter days with near-zero cumulative are artefacts
-obs_days_complete$tavg_low_cumul[
-  obs_days_complete$day_in_wint > 180 &
-    obs_days_complete$tavg_low_cumul < 100
-] <- NA
-
-# Interpolated fractional day_in_wint values are unreliable
-obs_days_complete$tavg_low_cumul[
-  obs_days_complete$day_in_wint %% 1 != 0
+  obs_days_complete$year == first_year
 ] <- NA
 
 # Drop rows where cumulative heat is NA (needed for GLS)
@@ -98,19 +86,19 @@ obs_days_complete <- obs_days_complete %>%
 
 fig_heatneed_per_year <-
   obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, y = tavg_low_cumul)) +
+  ggplot(aes(x = day_in_year, y = tavg_low_cumul)) +
   theme_bw() +
   geom_line(
     alpha = 0.7,
     mapping = aes(
       color = year,
       fill = year,
-      group = factor(ywint)
+      group = factor(year)
     )
   ) +
   labs(
-    x = "Day in season (starts Aug 1st)",
-    y = "Cumulative missing degrees (C * days)"
+    x = "Day of year",
+    y = "Cumulative heating need (C * days)"
   )
 
 
@@ -125,9 +113,9 @@ fig_heatneed_per_year <-
 # We increase iterations and provide a fallback without varExp.
 mod_cum <- tryCatch({
   gls(
-    tavg_low_cumul ~ ns(day_in_wint, df = 8),
+    tavg_low_cumul ~ ns(day_in_year, df = 8),
     data    = obs_days_complete,
-    weights = varExp(form = ~day_in_wint),
+    weights = varExp(form = ~day_in_year),
     na.action = na.omit,
     control = glsControl(
       maxIter = 200, msMaxIter = 200
@@ -139,7 +127,7 @@ mod_cum <- tryCatch({
     "\nFalling back to GLS without variance weighting."
   )
   gls(
-    tavg_low_cumul ~ ns(day_in_wint, df = 8),
+    tavg_low_cumul ~ ns(day_in_year, df = 8),
     data      = obs_days_complete,
     na.action = na.omit
   )
@@ -152,18 +140,18 @@ fig_modcum_gls <- capture_plot(plot(mod_cum))
 # 6. Observed SDs per day and SD model
 # ============================================================
 
-# For each day_in_wint, compute the SD of cumulative heat
+# For each day_in_year, compute the SD of cumulative heat
 # across all observed years.  This gives us a "pseudo
 # prediction interval" that the GLS couldn't provide cleanly.
 sds <- data.frame(
-  day_in_wint = 1:364,
+  day_in_year = 1:366,
   sd_obs = NA_real_
 )
 
 for (i in 1:nrow(sds)) {
   sds$sd_obs[i] <-
     obs_days_complete %>%
-    filter(day_in_wint == sds$day_in_wint[i]) %>%
+    filter(day_in_year == sds$day_in_year[i]) %>%
     .$tavg_low_cumul %>%
     sd(na.rm = TRUE)
 }
@@ -171,7 +159,7 @@ for (i in 1:nrow(sds)) {
 # Fit a smooth curve through the observed SDs
 # No intercept (-1) because SD should be ~0 at day 0
 mod_cum_obs <- lm(
-  sd_obs ~ ns(day_in_wint, df = 5) - 1,
+  sd_obs ~ ns(day_in_year, df = 5) - 1,
   data = sds
 )
 
@@ -191,8 +179,8 @@ sds$mean_pred <- predict(mod_cum, newdata = sds)
 # ============================================================
 
 # Interpolation functions for SD and mean cumulative heat
-sd_fun   <- approxfun(sds$day_in_wint, sds$sd_pred)
-mean_fun <- approxfun(sds$day_in_wint, sds$mean_pred)
+sd_fun   <- approxfun(sds$day_in_year, sds$sd_pred)
+mean_fun <- approxfun(sds$day_in_year, sds$mean_pred)
 
 # Given a day and observed cumulative heat, return the
 # z-score and its percentile (assuming normality)
@@ -214,10 +202,10 @@ return_std_tmp <- function(day_act, tmp_act) {
 obs_days_complete <- obs_days_complete %>%
   mutate(
     z = return_std_tmp(
-      day_in_wint, tavg_low_cumul
+      day_in_year, tavg_low_cumul
     )[["z"]],
     z_perc = return_std_tmp(
-      day_in_wint, tavg_low_cumul
+      day_in_year, tavg_low_cumul
     )[["z_perc"]]
   )
 
@@ -227,44 +215,36 @@ obs_days_complete <- obs_days_complete %>%
 # ============================================================
 
 # For each day, compute the correlation between that day's
-# z-score and the final z-score (day 364).  This tells us
-# how predictive the current cumulative heat is of the
-# season-total.
+# z-score and the end-of-year z-score (day 365).  In the
+# calendar year system, every day correlates with the same
+# year's Dec 31 — no offset hack needed.
 
 final_z <-
   obs_days_complete %>%
-  filter(day_in_wint == 364) %>%
-  mutate(id = 1:n())
+  filter(day_in_year == 365) %>%
+  select(year, z_final = z)
 
 sds$cor_z <- NA_real_
 
-for (i in 1:364) {
+for (i in 1:366) {
   act_z <-
     obs_days_complete %>%
-    filter(day_in_wint == i)
+    filter(day_in_year == i) %>%
+    select(year, z_day = z) %>%
+    left_join(y = final_z, by = "year")
 
-  # Before day 155 (roughly January), the current season's
-  # end hasn't happened yet, so we correlate with the
-  # *next* season's final value (id offset by 1)
-  if (i < 155) {
-    act_z <- act_z %>%
-      mutate(id = 2:(n() + 1)) %>%
-      left_join(y = final_z, by = "id")
-  } else {
-    act_z <- act_z %>%
-      mutate(id = 1:n()) %>%
-      left_join(y = final_z, by = "id")
+  if (nrow(act_z) > 2 &&
+      sum(!is.na(act_z$z_day) & !is.na(act_z$z_final)) > 2) {
+    sds$cor_z[i] <- cor(
+      act_z$z_day, act_z$z_final,
+      use = "pairwise.complete.obs"
+    )
   }
-
-  sds$cor_z[i] <- cor(
-    act_z$z.x, act_z$z.y,
-    use = "pairwise.complete.obs"
-  )
 }
 
 # Fit a smooth spline to the correlation curve
 mod_cor <- lm(
-  cor_z ~ ns(day_in_wint, df = 3) - 1,
+  cor_z ~ ns(day_in_year, df = 3) - 1,
   data = sds
 )
 
@@ -284,7 +264,7 @@ sds <- sds %>%
   )
 
 # Correlation interpolation function for downstream use
-cor_fun <- approxfun(sds$day_in_wint, sds$cor_z_pred)
+cor_fun <- approxfun(sds$day_in_year, sds$cor_z_pred)
 
 
 # ============================================================
@@ -293,14 +273,14 @@ cor_fun <- approxfun(sds$day_in_wint, sds$cor_z_pred)
 
 fig_heatneed_bands <-
   obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, y = tavg_low_cumul)) +
+  ggplot(aes(x = day_in_year, y = tavg_low_cumul)) +
   theme_bw() +
   geom_line(
     alpha = 0.7,
     mapping = aes(
       color = year,
       fill = year,
-      group = factor(ywint)
+      group = factor(year)
     )
   ) +
   geom_line(
@@ -319,8 +299,8 @@ fig_heatneed_bands <-
     color = "red", linewidth = 1.5
   ) +
   labs(
-    x = "Day in season (starts Aug 1st)",
-    y = "Cumulative missing degrees (C * days)",
+    x = "Day of year",
+    y = "Cumulative heating need (C * days)",
     title = "Heating need by year + mean/CI"
   )
 
@@ -335,13 +315,13 @@ fig_heatneed_bands <-
 # flexibility.  Kept here for reference / future exploration.
 #
 # dat_days_grouped <- groupedData(
-#   tavg_low_cumul ~ day_in_wint | year,
+#   tavg_low_cumul ~ day_in_year | year,
 #   data = obs_days_complete %>%
 #     filter(!is.na(tavg_low_cumul))
 # )
 #
 # mod_nlme <- nlme(
-#   tavg_low_cumul ~ SSlogis(day_in_wint, Asym, xmid, scal),
+#   tavg_low_cumul ~ SSlogis(day_in_year, Asym, xmid, scal),
 #   random = Asym ~ 1 | year,
 #   data = dat_days_grouped
 # )

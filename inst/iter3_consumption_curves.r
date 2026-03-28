@@ -37,7 +37,7 @@ dat_readings <- obs_readings %>%
   filter(
     !is.na(tact),
     !is.infinite(tact),
-    !is.na(ywint)
+    !is.na(year)
   )
 
 # -- For obs_hours the "tact" equivalent is just tavg.
@@ -59,15 +59,14 @@ KEDV_HATRA <- 1730 - USED_UP
 # 2. Exploratory figures: consumption vs temperature
 # ============================================================
 
-# fig_1: GAM curves of daily-avg temp vs gas rate, by ywint
+# fig_1: GAM curves of daily-avg temp vs gas rate, by year
 fig_1 <- dat_hours %>%
   filter(!is.na(Rate)) %>%
-  mutate(ywint = forcats::fct_drop(ywint)) %>%
   ggplot(aes(
     x = tact,
     y = Rate,
-    fill = ywint,
-    color = ywint
+    fill = factor(year),
+    color = factor(year)
   )) +
   theme_bw() +
   geom_point(alpha = 0.05) +
@@ -84,14 +83,12 @@ fig_1 <- dat_hours %>%
 
 # fig_2: Same but filtered to tact < 20 (heating days only)
 fig_2 <- dat_hours %>%
-  filter(!is.na(Rate)) %>%
-  mutate(ywint = droplevels(ywint)) %>%
-  filter(tact < 20) %>%
+  filter(!is.na(Rate), tact < 20) %>%
   ggplot(aes(
     x = tact,
     y = Rate,
-    fill = as.factor(ywint),
-    color = as.factor(ywint)
+    fill = factor(year),
+    color = factor(year)
   )) +
   theme_bw() +
   geom_point(alpha = 0.05) +
@@ -111,11 +108,11 @@ fig_2 <- dat_hours %>%
 # 3. Filter outliers for modeling
 # ============================================================
 
-# Remove the winter we went to Australia (2019 ywint, warm
+# Remove the winter we went to Australia (2019 year, warm
 # days only kept) and cap at 50 m3/day rate as outlier guard
 dat_hours_nice <- dat_hours %>%
   filter(
-    ywint != "2019" | tact > 10
+    year != 2019 | tact > 10
   ) %>%
   filter(Rate < 50 | is.na(Rate)) %>%
   mutate(
@@ -127,13 +124,13 @@ dat_hours_nice <- dat_hours %>%
 
 
 # ============================================================
-# 4. Fit consumption model: Rate ~ tact * spline(day_in_wint)
+# 4. Fit consumption model: Rate ~ tact * spline(day_in_year)
 # ============================================================
 
 # This interaction lets the temperature-consumption slope
 # vary across the season (steeper in mid-winter)
 mod_consumption <- lm(
-  Rate ~ tact * ns(day_in_wint, df = 3),
+  Rate ~ tact * ns(day_in_year, df = 3),
   data = dat_hours_nice
 )
 
@@ -144,7 +141,7 @@ mod_consumption <- lm(
 
 
 # ============================================================
-# 5. Temperature model: predict tact from hour + day_in_wint
+# 5. Temperature model: predict tact from hour + day_in_year
 # ============================================================
 
 # "Silly idea" (per original): we added the sinus for hourly
@@ -152,7 +149,7 @@ mod_consumption <- lm(
 # seasonal temperature curve
 mod_temp <- lm(
   tact ~ I(sin(hours_dat / 24 * pi)) +
-    ns(day_in_wint, df = 5),
+    ns(day_in_year, df = 5),
   data = dat_hours
 )
 
@@ -161,35 +158,19 @@ mod_temp <- lm(
 # 6. Build prediction grid
 # ============================================================
 
-# 24 hours x 365 days = 8760 rows
+# 24 hours x 366 days = 8784 rows (covers leap years)
 dat_preds <- expand.grid(
   hours_dat   = 0:23,
-  day_in_year = 1:365,
+  day_in_year = 1:366,
   id          = max(dat_hours_nice$id)
 ) %>%
   mutate(
+    # Heating season: roughly Oct 1 (day 274) - May 15 (day 135)
     heat_off = ifelse(
-      day_in_year > 258 | day_in_year < 135,
-      "on", "off"
+      day_in_year > 135 & day_in_year < 274,
+      "off", "on"
     ),
-    date_good = yday_inverse(day_in_year),
-    # day_in_wint: same transformation as in
-    # merge_transform_weather()
-    day_in_wint = ifelse(
-      day_in_year < 213,
-      day_in_year + 365 - 213,
-      day_in_year - 213
-    )
-  ) %>%
-  # Shift dates so the "year" starts in August
-  mutate(
-    date_good = ifelse(
-      date_good < as.Date("2022-08-01"),
-      date_good + years(1),
-      date_good
-    ) %>% as_date(),
-    # Alternative parameterization: distance from mid-winter
-    dwint_2 = abs((day_in_wint - 182.5) / 182.5)
+    date_good = yday_inverse(day_in_year)
   ) %>%
   group_by(hours_dat, day_in_year) %>%
   slice(1) %>%
@@ -228,14 +209,14 @@ dat_preds$gas_corr <- dat_preds$gas * correction
 # so each observation is truly independent
 mod_b <- lm(
 
-  Rate ~ ns(tact, df = 1) + ywint,
+  Rate ~ ns(tact, df = 1) + year,
   data = dat_readings
 )
 
 # Predictions from the simpler model
 dat_nd <- expand.grid(
   tact  = seq(0, 20, 0.1),
-  ywint = dat_readings$ywint[nrow(dat_readings)]
+  year = dat_readings$year[nrow(dat_readings)]
 )
 dat_nd$pred <- predict(mod_b, newdata = dat_nd)
 

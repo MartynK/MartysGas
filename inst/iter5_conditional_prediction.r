@@ -24,14 +24,8 @@ load(here::here("data", "cumulative_heat_models.Rdata"))
 # Current year -- should match iter4
 ACT_YEAR <- 2025
 
-# Which ywint factor level corresponds to ACT_YEAR
-act_ywint <- obs_days_complete %>%
-  ungroup() %>%
-  mutate(ywint = as.numeric(as.character(ywint))) %>%
-  filter(year(Date) == ACT_YEAR) %>%
-  mutate(ywint = max(ywint)) %>%
-  slice(1) %>%
-  pull(ywint)
+# Current calendar year for filtering
+act_year <- ACT_YEAR
 
 # Confidence level for prediction bands
 CONF_LEV <- 1.96
@@ -45,7 +39,7 @@ CONF_LEV <- 1.96
 # tavgl_left = "temperature-degrees left to accumulate"
 # For each year, this is max(cumul) - current_cumul
 obs_days_complete <- obs_days_complete %>%
-  group_by(ywint) %>%
+  group_by(year) %>%
   mutate(
     tavg_low_cum_ratio = tavg_low_cumul /
       max(tavg_low_cumul, na.rm = TRUE),
@@ -56,13 +50,13 @@ obs_days_complete <- obs_days_complete %>%
 
 # Summary stats across completed seasons
 tavgcum_exp_sd <- obs_days_complete %>%
-  group_by(ywint) %>%
+  group_by(year) %>%
   filter(day_in_year == max(day_in_year)) %>%
   .$tavg_low_cumul %>%
   sd(na.rm = TRUE)
 
 tavgcum_exp <- obs_days_complete %>%
-  group_by(ywint) %>%
+  group_by(year) %>%
   filter(day_in_year == max(day_in_year)) %>%
   .$tavg_low_cumul %>%
   mean(na.rm = TRUE)
@@ -76,19 +70,19 @@ for (i in 1:364) {
   x <- obs_days_complete %>%
     ungroup() %>%
     filter(
-      day_in_wint == i,
-      ywint != act_ywint
+      day_in_year == i,
+      year != act_year
     ) %>%
-    select(tavgl_left, ywint)
+    select(tavgl_left, year)
 
   y <- obs_days_complete %>%
-    group_by(ywint) %>%
-    filter(ywint != act_ywint) %>%
-    filter(day_in_wint == max(day_in_wint)) %>%
-    select(tavg_low_cumul, ywint)
+    group_by(year) %>%
+    filter(year != act_year) %>%
+    filter(day_in_year == max(day_in_year)) %>%
+    select(tavg_low_cumul, year)
 
-  mat <- left_join(x, y, by = "ywint") %>%
-    select(-ywint) %>%
+  mat <- left_join(x, y, by = "year") %>%
+    select(-year) %>%
     as.matrix()
 
   vec_cors[i] <- cor(mat, use = "pairwise.complete.obs")[1, 2]
@@ -99,8 +93,8 @@ for (i in 1:364) {
 obs_days_complete <- obs_days_complete %>%
   rowwise() %>%
   mutate(
-    tavgcum_cor = vec_cors[round(day_in_wint) + 1],
-    tavgcum_sd  = vec_sds[round(day_in_wint) + 1]
+    tavgcum_cor = vec_cors[round(day_in_year) + 1],
+    tavgcum_sd  = vec_sds[round(day_in_year) + 1]
   ) %>%
   ungroup()
 
@@ -109,15 +103,15 @@ obs_days_complete <- obs_days_complete %>%
 # 3. Models for mean and SD of remaining heat need
 # ============================================================
 
-# Mean remaining heat need as a function of day_in_wint
+# Mean remaining heat need as a function of day_in_year
 mod_tavg_low_cum_mean <- lm(
-  tavgl_left ~ ns(day_in_wint, df = 5),
+  tavgl_left ~ ns(day_in_year, df = 5),
   data = obs_days_complete
 )
 
 # SD of remaining heat need (captures heteroscedasticity)
 mod_tavg_low_cum_sd <- lm(
-  tavgcum_sd ~ ns(day_in_wint, df = 11),
+  tavgcum_sd ~ ns(day_in_year, df = 11),
   data = obs_days_complete
 )
 
@@ -143,42 +137,42 @@ obs_days_complete$tavgl_left_pred_sd <- predict(
 # unconditional band towards the observed trajectory.
 predict_future_needs <- function(
     conf_lev = 1.96,
-    day_in_wint_act = 173,
+    day_in_year_act = 173,
     cum_t_act = 1530,
     sds. = sds,
     full = TRUE
 ) {
   cor_fun_local <- approxfun(
-    sds.$day_in_wint, sds.$cor_z_pred
+    sds.$day_in_year, sds.$cor_z_pred
   )
-  cor_act     <- cor_fun_local(day_in_wint_act)
+  cor_act     <- cor_fun_local(day_in_year_act)
   sd_expected <- sqrt(1 - cor_act^2)
   z_act       <- return_std_tmp(
-    day_in_wint_act, cum_t_act
+    day_in_year_act, cum_t_act
   )$z
   z_expected  <- cor_act * z_act
 
   # full = TRUE returns the entire trajectory from
-  # day_in_wint_act to 364; FALSE returns only day 364
+  # day_in_year_act to 365; FALSE returns only day 365
   if (full == FALSE) {
-    dayz <- 364
+    dayz <- 365
   } else {
-    dayz <- day_in_wint_act:364
+    dayz <- day_in_year_act:365
   }
 
   expecteds <-
-    data.frame(day_in_wint = dayz) %>%
-    left_join(x = ., y = sds., by = "day_in_wint") %>%
+    data.frame(day_in_year = dayz) %>%
+    left_join(x = ., y = sds., by = "day_in_year") %>%
     mutate(
       prop_var = (cor_z_pred - cor_act) / (1 - cor_act),
       sd_act   = sd_expected * prop_var,
       z_act.   = seq(z_act, z_expected, length.out = n()),
-      lower_expected = mean_fun(day_in_wint) +
+      lower_expected = mean_fun(day_in_year) +
         (z_act. - sd_act * conf_lev) *
-        sd_fun(day_in_wint),
-      upper_expected = mean_fun(day_in_wint) +
+        sd_fun(day_in_year),
+      upper_expected = mean_fun(day_in_year) +
         (z_act. + sd_act * conf_lev) *
-        sd_fun(day_in_wint)
+        sd_fun(day_in_year)
     )
 
   return(expecteds)
@@ -199,7 +193,7 @@ obs_days_complete <- obs_days_complete %>%
     # Efficiency ratio: gas spent per degree of heating need
     spent_tavg = Spent / tavg_low_cumul,
     # Gas budget remaining (0.4 m3/day hot water baseline)
-    gas_left = 1730 - 0.4 * (365 - day_in_wint) - Spent,
+    gas_left = 1730 - 0.4 * (365 - day_in_year) - Spent,
     # Suggested rate for the rest of the season
     spent_tavg_left_mean = gas_left / tavgl_left_pred,
     spent_tavg_left_upr  = gas_left / tavgcum_pred_upr,
@@ -208,39 +202,24 @@ obs_days_complete <- obs_days_complete %>%
 
 
 # ============================================================
-# 6. January deadline calculations (from iter9 lines 215-237)
+# 6. Jan 5 meter reading anchor
 # ============================================================
 
-# January 5 is the atalany true-up deadline.
-# day_in_wint = 157 corresponds to ~Jan 5
-
+# In the calendar year system, Jan 5 (yday = 5) is when
+# the physical meter gets read.  For each year, find the
+# meter value closest to Jan 5 and use it as the "start
+# of year" anchor for gas_left calculations.
 jan_gasvals <- obs_days_complete %>%
-  filter(day_in_wint == 157) %>%
-  select(Meter, Spent, Date)
+  filter(day_in_year == 5) %>%
+  select(year, Meter_jan = Meter)
 
-# For each row, compute gas remaining if Jan 5 were the
-# deadline (ie. looking at the meter value on Jan 5 of
-# that year)
-obs_days_complete$gas_left_jan <- NA_real_
-for (i in 1:nrow(obs_days_complete)) {
-  act_yr <- year(obs_days_complete$Date[i])
-  act_last_meter <- jan_gasvals$Meter[
-    act_yr == year(jan_gasvals$Date)
-  ]
-  if (length(act_last_meter) == 1) {
-    obs_days_complete$gas_left_jan[i] <-
-      1730 - obs_days_complete$Meter[i] + act_last_meter
-  }
-}
-
-# Suggested rate if targeting January deadline
 obs_days_complete <- obs_days_complete %>%
+  left_join(jan_gasvals, by = "year") %>%
   mutate(
-    tavgl_left_jan = predict(
-      mod_tavg_low_cum_mean,
-      newdata = data.frame(day_in_wint = 157)
-    ) - tavg_low_cumul,
-    spent_tavg_left_jan = gas_left_jan / tavgl_left_jan
+    # Gas consumed since the Jan 5 reading of this year
+    gas_since_jan = Meter - Meter_jan,
+    # Budget remaining against the 1729 m3 annual quota
+    gas_left_jan  = 1729 - gas_since_jan
   )
 
 
@@ -248,38 +227,28 @@ obs_days_complete <- obs_days_complete %>%
 # 7. Key figures
 # ============================================================
 
-# Efficiency ratio over time, most recent season
-ywint_lim <- obs_days_complete %>%
-  filter(year(Date) == ACT_YEAR) %>%
-  slice_tail(n = 1) %>%
-  pull(ywint) %>%
-  as.character()
+# Efficiency ratio over time, current calendar year
+year_lim <- ACT_YEAR
 
-# Date axis limits for the current season
-date_limits <-
-  obs_days_complete %>%
-  filter(ywint == ywint_lim) %>%
-  arrange(day_in_wint) %>%
-  .[60, ] %>%
-  pull(Date) %>%
-  year() %>%
-  paste0(., "-08-01") %>%
-  as.POSIXct() %>%
-  rep(., 2)
-date_limits[2] <- date_limits[2] + 365 * 24 * 3600
+# Date axis: Jan 1 - Dec 31 of current year
+date_limits <- c(
+  as.POSIXct(paste0(year_lim, "-01-01")),
+  as.POSIXct(paste0(year_lim, "-12-31"))
+)
 
 fig_efficiency_ratio <-
   obs_days_complete %>%
-  filter(ywint == ywint_lim) %>%
+  filter(year == year_lim) %>%
   ggplot(aes(
     x = Date,
     y = spent_tavg,
-    color = gas_left
+    color = gas_left_jan
   )) +
   theme_bw() +
   scale_color_gradient(
     high = "blue", low = "green",
-    limits = c(0, 1730)
+    limits = c(0, 1729),
+    name = "Gas left (m3)"
   ) +
   geom_line(linewidth = 1.5) +
   geom_line(
@@ -297,11 +266,6 @@ fig_efficiency_ratio <-
     color = "grey70",
     linetype = "dashed", linewidth = 1.2
   ) +
-  geom_line(
-    aes(y = spent_tavg_left_jan),
-    color = "salmon4",
-    linetype = "solid", linewidth = 1.2
-  ) +
   scale_y_continuous(limits = c(0, 1)) +
   scale_x_datetime(
     date_breaks = "1 month",
@@ -310,19 +274,19 @@ fig_efficiency_ratio <-
   ) +
   labs(
     x = "",
-    y = "Average gas consumption (m3 / C*day)"
+    y = "Gas efficiency (m3 / C*day)"
   )
 
 # Conditional prediction bands figure
 fig_conditional_bands <-
   obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, y = tavg_low_cumul)) +
+  ggplot(aes(x = day_in_year, y = tavg_low_cumul)) +
   theme_bw() +
   geom_line(
     alpha = 0.7,
     mapping = aes(
       color = year,
-      group = factor(ywint)
+      group = factor(year)
     )
   ) +
   geom_line(
@@ -341,8 +305,8 @@ fig_conditional_bands <-
     color = "red", linewidth = 1.5
   ) +
   labs(
-    x = "Day in season",
-    y = "Cumulative missing degrees (C * days)",
+    x = "Day of year",
+    y = "Cumulative heating need (C * days)",
     title = "Unconditional + conditional bands"
   )
 

@@ -1,43 +1,35 @@
 ---
 title: "child2"
-format: docx
+format: html
 editor: visual
 ---
 
 # Quantifying cold and long winters
 
-The amount of energy required for heating is the function of the outside temperature.
+The amount of energy required for heating is a function of the outside temperature.
 
-Therefore to predict the energy needs left in a given (heating) season, we should make a prediction about the expected amount of energy required until the end of the season.
+Therefore to predict the energy needs left in a given year, we should make a prediction about the expected amount of energy required until December 31.
 
-Thankfully things seem to be straightforward if we assume that the inside temperature of the building should be constant (it's not but bear with me). Assume 20°C (68°F). Heat loss is linear to the difference in temperature between the inside and outside temperatures [link](http://hyperphysics.phy-astr.gsu.edu/hbase/thermo/heatloss.html).
-
-Therefore when the outside temperature is 16°C we would need 4x the power to heat the building than if it would be 19°C. Also, this amount of energy needed for these two days is the same that we would need for heating for 3 days if it were $20 - 5/3 = 18.33$ degrees outside. In other words for a given heating season, we would add up the "missing degrees" until 20 for every day the outside temperature was less than 20°.
+Assume a constant indoor temperature of 20 °C. Heat loss is linear to the inside-outside temperature difference. Therefore when the outside temperature is 16 °C we need 4x the power than if it were 19 °C. For a given year we add up the "missing degrees" below 20 for every day — the **cumulative heating need** in °C·days.
 
 ```{r fig-heatneed-per-year}
-#| fig-cap: "Cumulative heating energy needs by year"
+#| fig-cap: "Cumulative heating energy needs by calendar year"
 
-# This figure is produced by iter4_cumulative_heat_model.r
 # obs_days_complete is loaded via cumulative_heat_models.Rdata
 obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, y = tavg_low_cumul)) +
+  ggplot(aes(x = day_in_year, y = tavg_low_cumul)) +
   theme_bw() +
   geom_line(alpha = .7,
             mapping = aes(color = year,
                           fill = year,
-                          group = factor(ywint))) +
-  labs(x = "Day in the season (starts Aug.1st)",
+                          group = factor(year))) +
+  labs(x = "Day of year",
        y = "Heating energy needs [°C*Day]")
 ```
 
-I personally like this approach very much, but of course we are neglecting:
+We are neglecting solar radiation and building heat capacity. For simplicity, assume that at each day the distribution of cumulative heating needs across years is approximately normal.
 
--   The effects of solar radiation, eg. sunlight heats up the building a bit,
--   the building's heat capacity, eg. after a hot summer's day, it takes about 3 days for the walls to cool
-
-For simplicity and to retain my sanity, lets also assume that at each timepoint (day), the distribution of 'energy needs' is normal.
-
-I'd like to fit a *linear model* for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I'd opt for a *generalized least squares* model with an *exponential variance structure* (meaning that the residuals are understood to have a larger variance when more days have elapsed).
+A **GLS model** with a natural spline (8 df) captures the seasonal curve. An exponential variance structure accounts for increasing spread as the year progresses.
 
 ```{r fig-gls-effects}
 #| fig-cap: "GLS model effects"
@@ -48,28 +40,28 @@ mod_cum %>%
   plot()
 ```
 
-As a "petty craftsman" kind of approach, I calculated standard deviations for all days and then fitted a *linear model* over it with a natural spline term capturing the evolution of standard deviation in heating needs over the course of a season.
+Standard deviations for each day of year, smoothed with a natural spline:
 
 ```{r fig-sd-effects}
-#| fig-cap: "Observed SD evolution over the season"
+#| fig-cap: "Observed SD evolution over the year"
 
 mod_cum_obs %>%
   effects::predictorEffects(partial.residuals = TRUE) %>%
   plot()
 ```
 
-Now we have a mean and a variance for the cumulative heating energy needs on any given day (at my location)! I can then assign a z-score for each result through the years.
+Now we have a mean and variance for cumulative heating needs on any day. We assign z-scores to every observed year.
 
 ```{r fig-cumulative-with-bands}
 #| fig-cap: "Cumulative heating needs with mean and 95% CI bands"
 
 obs_days_complete %>%
-  ggplot(aes(x = day_in_wint, y = tavg_low_cumul)) +
+  ggplot(aes(x = day_in_year, y = tavg_low_cumul)) +
   theme_bw() +
   geom_line(alpha = .7,
             mapping = aes(color = year,
                           fill = year,
-                          group = factor(ywint))) +
+                          group = factor(year))) +
   geom_line(data = sds,
             mapping = aes(y = mean_pred),
             color = "salmon4", linewidth = 1.5) +
@@ -84,46 +76,39 @@ obs_days_complete %>%
 
 # Estimating total energy needs left on a given day
 
-This is all well and good, and this translates to an estimated total energy need at the beginning of a season, but we are mainly interested in the *conditional* energy need for the total season if we have observed the cumulative energy need up to day "*d".*
+We are mainly interested in the *conditional* energy need for the total year given what we have observed up to day *d*.
 
-I start with investigating how do energy need values observed on a given day *correlate* to the *total* energy need for a given season. Specifically, what was the correlation between the z-scores of a given day vs. the last day in a season.
+How well does the z-score on a given day predict the end-of-year z-score?
 
 ```{r fig-correlation-evolution}
-#| fig-cap: "Correlation between mid-season z-score and end-of-season z-score"
+#| fig-cap: "Correlation between current z-score and end-of-year z-score"
 
 sds %>%
-  ggplot(aes(x = day_in_wint, y = cor_z)) +
+  ggplot(aes(x = day_in_year, y = cor_z)) +
   theme_bw() +
   geom_line()
 ```
 
-The spike around day 150 is due to leap years (probably); didn't bother to fix it, as it didn't bother the results much.
-
 
 # Figuring in actual energy usage
 
-The key insight is that a linear budget makes no sense — winter months consume vastly more gas than summer. Instead we track the **ratio of gas consumed to cumulative heating need** (m³ per °C·day). If this ratio stays stable, we can predict total annual gas usage by combining it with the *conditional* total heat need forecast.
+We track the **ratio of gas consumed to cumulative heating need** (m³ per °C·day). If this ratio stays stable, we can predict total annual gas usage by combining it with the *conditional* total heat need forecast.
 
 ```{r fig-spent-vs-heatneed}
 #| fig-cap: "Gas consumed vs. cumulative heat need (all years)"
 
-# Gas consumed (m3) plotted against cumulative heat need
-# Black box = ideal budget (1729 m3 for ~3284 °C·days)
-# Salmon slope = mean efficiency across years
 QUOTA_M3 <- 1729
 
-# Only keep seasons that start near (0,0): the first
-# observation in a season should have low Spent AND low
-# tavg_low_cumul. Drop seasons with a broken origin.
+# Only keep years that start near (0,0)
 dat_plot_heatneed <- obs_days_complete %>%
   filter(Spent > 0, tavg_low_cumul > 0) %>%
-  group_by(ywint) %>%
+  group_by(year) %>%
   filter(min(tavg_low_cumul, na.rm = TRUE) < 50) %>%
   ungroup()
 
 dat_plot_heatneed %>%
   ggplot(aes(x = tavg_low_cumul, y = Spent,
-             color = factor(year(Date)))) +
+             color = factor(year))) +
   geom_point(alpha = 0.6, size = 0.8) +
   geom_smooth(method = "lm",
               mapping = aes(color = "smootho"),
@@ -153,45 +138,35 @@ dat_plot_heatneed %>%
        color = "Year")
 ```
 
-## Seasonal efficiency tracking
+## Efficiency tracking (Jan–Dec)
 
-Rather than a flat daily budget, we track the *gas consumption efficiency* — how many m³ of gas per °C·day of heating need. This ratio should stay roughly stable over a season. If it climbs, we are over-heating; if it drops, we are under-heating (or the heat pump is picking up slack).
+Rather than a flat daily budget, we track the *gas consumption efficiency* — how many m³ of gas per °C·day of heating need. This ratio should stay roughly stable. If it climbs, we are over-heating; if it drops, the heat pump is picking up slack.
 
-The dashed grey lines show the predicted efficiency band for the remaining season, based on conditional forecasts of total heat need.
+The dashed grey lines show the predicted efficiency band based on conditional forecasts of total heat need.
 
 ```{r fig-efficiency-dashboard}
 #| fig-cap: "Gas efficiency ratio: current year vs. predicted band"
 
-# Determine the current/latest ywint
-act_ywint <- obs_days_complete %>%
-  ungroup() %>%
-  filter(Date == max(Date, na.rm = TRUE)) %>%
-  slice(1) %>%
-  pull(ywint)
-
-# X-axis: Jan 1 of the current year to Jul 31
-# (practical view — meter was read ~Jan 5, this is
-# the window we care about for budget tracking)
+# X-axis: Jan 1 to Dec 31 of current year
 current_year <- lubridate::year(Sys.Date())
 date_limits <- c(
   as.POSIXct(paste0(current_year, "-01-01")),
-  as.POSIXct(paste0(current_year, "-07-31"))
+  as.POSIXct(paste0(current_year, "-12-31"))
 )
 
-# The key plot: efficiency ratio over the season
+# The key plot: efficiency ratio over the year
 # Color gradient: blue (lots of gas left) -> green (tight)
 obs_days_complete %>%
-  filter(ywint == act_ywint,
-         Date >= date_limits[1]) %>%
+  filter(year == current_year) %>%
   ggplot(aes(x = Date, y = spent_tavg,
-             color = gas_left)) +
+             color = gas_left_jan)) +
   theme_bw() +
   scale_color_gradient(
     high = "blue", low = "green",
-    limits = c(0, QUOTA_M3),
+    limits = c(0, 1729),
     name = "Gas left (m³)") +
   geom_line(linewidth = 1.5) +
-  # Predicted mean efficiency for remaining season
+  # Predicted mean efficiency for remaining year
   geom_line(aes(y = spent_tavg_left_mean),
             color = "grey50",
             linetype = "dashed", linewidth = 1.2) +
@@ -205,10 +180,10 @@ obs_days_complete %>%
   scale_y_continuous(limits = c(0, 1)) +
   scale_x_datetime(
     date_breaks = "1 month",
-    date_labels = "%b %Y",
+    date_labels = "%b",
     limits = date_limits) +
   labs(x = "", y = "Gas consumption (m³ per °C·day)",
-       title = "Seasonal efficiency: Jan–Jul view")
+       title = "Efficiency tracking: Jan–Dec")
 ```
 
-The solid colored line shows actual gas usage efficiency (m³ per °C·day of heat need), colored by remaining gas budget. When the line stays within the grey dashed prediction bands, the budget is on track. If the line moves above the upper band, gas consumption is too aggressive relative to expected remaining heat need.
+The solid colored line shows actual gas usage efficiency, colored by remaining gas budget. When the line stays within the grey dashed prediction bands, the budget is on track.

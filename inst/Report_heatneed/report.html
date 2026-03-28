@@ -37,35 +37,6 @@ ul.task-list li input[type="checkbox"] {
 <link href="report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="report_files/libs/bootstrap/bootstrap-9e3ffae467580fdb927a41352e75a2e0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 
-  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
-
-<script type="text/javascript">
-const typesetMath = (el) => {
-  if (window.MathJax) {
-    // MathJax Typeset
-    window.MathJax.typeset([el]);
-  } else if (window.katex) {
-    // KaTeX Render
-    var mathElements = el.getElementsByClassName("math");
-    var macros = [];
-    for (var i = 0; i < mathElements.length; i++) {
-      var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
-        window.katex.render(texText.data, mathElements[i], {
-          displayMode: mathElements[i].classList.contains('display'),
-          throwOnError: false,
-          macros: macros,
-          fleqn: false
-        });
-      }
-    }
-  }
-}
-window.Quarto = {
-  typesetMath
-};
-</script>
 
 </head>
 
@@ -83,7 +54,7 @@ window.Quarto = {
   <li><a href="#estimating-total-energy-needs-left-on-a-given-day" id="toc-estimating-total-energy-needs-left-on-a-given-day" class="nav-link" data-scroll-target="#estimating-total-energy-needs-left-on-a-given-day">Estimating total energy needs left on a given day</a></li>
   <li><a href="#figuring-in-actual-energy-usage" id="toc-figuring-in-actual-energy-usage" class="nav-link" data-scroll-target="#figuring-in-actual-energy-usage">Figuring in actual energy usage</a>
   <ul class="collapse">
-  <li><a href="#seasonal-efficiency-tracking" id="toc-seasonal-efficiency-tracking" class="nav-link" data-scroll-target="#seasonal-efficiency-tracking">Seasonal efficiency tracking</a></li>
+  <li><a href="#efficiency-tracking-jandec" id="toc-efficiency-tracking-jandec" class="nav-link" data-scroll-target="#efficiency-tracking-jandec">Efficiency tracking (Jan–Dec)</a></li>
   </ul></li>
   <li><a href="#remarks" id="toc-remarks" class="nav-link" data-scroll-target="#remarks">Remarks</a>
   <ul class="collapse">
@@ -145,10 +116,9 @@ Meteorological data from 1995 onward is available for free at <a href="https://m
 </section>
 <section id="quantifying-cold-and-long-winters" class="level1">
 <h1>Quantifying cold and long winters</h1>
-<p>The amount of energy required for heating is the function of the outside temperature.</p>
-<p>Therefore to predict the energy needs left in a given (heating) season, we should make a prediction about the expected amount of energy required until the end of the season.</p>
-<p>Thankfully things seem to be straightforward if we assume that the inside temperature of the building should be constant (it’s not but bear with me). Assume 20°C (68°F). Heat loss is linear to the difference in temperature between the inside and outside temperatures <a href="http://hyperphysics.phy-astr.gsu.edu/hbase/thermo/heatloss.html">link</a>.</p>
-<p>Therefore when the outside temperature is 16°C we would need 4x the power to heat the building than if it would be 19°C. Also, this amount of energy needed for these two days is the same that we would need for heating for 3 days if it were <span class="math inline">\(20 - 5/3 = 18.33\)</span> degrees outside. In other words for a given heating season, we would add up the “missing degrees” until 20 for every day the outside temperature was less than 20°.</p>
+<p>The amount of energy required for heating is a function of the outside temperature.</p>
+<p>Therefore to predict the energy needs left in a given year, we should make a prediction about the expected amount of energy required until December 31.</p>
+<p>Assume a constant indoor temperature of 20 °C. Heat loss is linear to the inside-outside temperature difference. Therefore when the outside temperature is 16 °C we need 4x the power than if it were 19 °C. For a given year we add up the “missing degrees” below 20 for every day — the <strong>cumulative heating need</strong> in °C·days.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-heatneed-per-year" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -157,19 +127,14 @@ Meteorological data from 1995 onward is available for free at <a href="https://m
 <img src="report_files/figure-html/fig-heatneed-per-year-1.png" class="img-fluid figure-img" width="672">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-heatneed-per-year-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: Cumulative heating energy needs by year
+Figure&nbsp;1: Cumulative heating energy needs by calendar year
 </figcaption>
 </figure>
 </div>
 </div>
 </div>
-<p>I personally like this approach very much, but of course we are neglecting:</p>
-<ul>
-<li>The effects of solar radiation, eg. sunlight heats up the building a bit,</li>
-<li>the building’s heat capacity, eg. after a hot summer’s day, it takes about 3 days for the walls to cool</li>
-</ul>
-<p>For simplicity and to retain my sanity, lets also assume that at each timepoint (day), the distribution of ‘energy needs’ is normal.</p>
-<p>I’d like to fit a <em>linear model</em> for the energy needs with a natural spline term containing the elapsed days. To capture the apparent heteroscedasticity, I’d opt for a <em>generalized least squares</em> model with an <em>exponential variance structure</em> (meaning that the residuals are understood to have a larger variance when more days have elapsed).</p>
+<p>We are neglecting solar radiation and building heat capacity. For simplicity, assume that at each day the distribution of cumulative heating needs across years is approximately normal.</p>
+<p>A <strong>GLS model</strong> with a natural spline (8 df) captures the seasonal curve. An exponential variance structure accounts for increasing spread as the year progresses.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-gls-effects" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -184,7 +149,7 @@ Figure&nbsp;2: GLS model effects
 </div>
 </div>
 </div>
-<p>As a “petty craftsman” kind of approach, I calculated standard deviations for all days and then fitted a <em>linear model</em> over it with a natural spline term capturing the evolution of standard deviation in heating needs over the course of a season.</p>
+<p>Standard deviations for each day of year, smoothed with a natural spline:</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-sd-effects" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -193,13 +158,13 @@ Figure&nbsp;2: GLS model effects
 <img src="report_files/figure-html/fig-sd-effects-1.png" class="img-fluid figure-img" width="672">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-sd-effects-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;3: Observed SD evolution over the season
+Figure&nbsp;3: Observed SD evolution over the year
 </figcaption>
 </figure>
 </div>
 </div>
 </div>
-<p>Now we have a mean and a variance for the cumulative heating energy needs on any given day (at my location)! I can then assign a z-score for each result through the years.</p>
+<p>Now we have a mean and variance for cumulative heating needs on any day. We assign z-scores to every observed year.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-cumulative-with-bands" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -217,8 +182,8 @@ Figure&nbsp;4: Cumulative heating needs with mean and 95% CI bands
 </section>
 <section id="estimating-total-energy-needs-left-on-a-given-day" class="level1">
 <h1>Estimating total energy needs left on a given day</h1>
-<p>This is all well and good, and this translates to an estimated total energy need at the beginning of a season, but we are mainly interested in the <em>conditional</em> energy need for the total season if we have observed the cumulative energy need up to day “<em>d”.</em></p>
-<p>I start with investigating how do energy need values observed on a given day <em>correlate</em> to the <em>total</em> energy need for a given season. Specifically, what was the correlation between the z-scores of a given day vs.&nbsp;the last day in a season.</p>
+<p>We are mainly interested in the <em>conditional</em> energy need for the total year given what we have observed up to day <em>d</em>.</p>
+<p>How well does the z-score on a given day predict the end-of-year z-score?</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-correlation-evolution" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -227,17 +192,16 @@ Figure&nbsp;4: Cumulative heating needs with mean and 95% CI bands
 <img src="report_files/figure-html/fig-correlation-evolution-1.png" class="img-fluid figure-img" width="672">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-correlation-evolution-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;5: Correlation between mid-season z-score and end-of-season z-score
+Figure&nbsp;5: Correlation between current z-score and end-of-year z-score
 </figcaption>
 </figure>
 </div>
 </div>
 </div>
-<p>The spike around day 150 is due to leap years (probably); didn’t bother to fix it, as it didn’t bother the results much.</p>
 </section>
 <section id="figuring-in-actual-energy-usage" class="level1">
 <h1>Figuring in actual energy usage</h1>
-<p>The key insight is that a linear budget makes no sense — winter months consume vastly more gas than summer. Instead we track the <strong>ratio of gas consumed to cumulative heating need</strong> (m³ per °C·day). If this ratio stays stable, we can predict total annual gas usage by combining it with the <em>conditional</em> total heat need forecast.</p>
+<p>We track the <strong>ratio of gas consumed to cumulative heating need</strong> (m³ per °C·day). If this ratio stays stable, we can predict total annual gas usage by combining it with the <em>conditional</em> total heat need forecast.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-spent-vs-heatneed" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -252,10 +216,10 @@ Figure&nbsp;6: Gas consumed vs.&nbsp;cumulative heat need (all years)
 </div>
 </div>
 </div>
-<section id="seasonal-efficiency-tracking" class="level2">
-<h2 class="anchored" data-anchor-id="seasonal-efficiency-tracking">Seasonal efficiency tracking</h2>
-<p>Rather than a flat daily budget, we track the <em>gas consumption efficiency</em> — how many m³ of gas per °C·day of heating need. This ratio should stay roughly stable over a season. If it climbs, we are over-heating; if it drops, we are under-heating (or the heat pump is picking up slack).</p>
-<p>The dashed grey lines show the predicted efficiency band for the remaining season, based on conditional forecasts of total heat need.</p>
+<section id="efficiency-tracking-jandec" class="level2">
+<h2 class="anchored" data-anchor-id="efficiency-tracking-jandec">Efficiency tracking (Jan–Dec)</h2>
+<p>Rather than a flat daily budget, we track the <em>gas consumption efficiency</em> — how many m³ of gas per °C·day of heating need. This ratio should stay roughly stable. If it climbs, we are over-heating; if it drops, the heat pump is picking up slack.</p>
+<p>The dashed grey lines show the predicted efficiency band based on conditional forecasts of total heat need.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div id="fig-efficiency-dashboard" class="quarto-float quarto-figure quarto-figure-center anchored">
@@ -270,7 +234,7 @@ Figure&nbsp;7: Gas efficiency ratio: current year vs.&nbsp;predicted band
 </div>
 </div>
 </div>
-<p>The solid colored line shows actual gas usage efficiency (m³ per °C·day of heat need), colored by remaining gas budget. When the line stays within the grey dashed prediction bands, the budget is on track. If the line moves above the upper band, gas consumption is too aggressive relative to expected remaining heat need.</p>
+<p>The solid colored line shows actual gas usage efficiency, colored by remaining gas budget. When the line stays within the grey dashed prediction bands, the budget is on track.</p>
 <div style="page-break-after: always;"></div>
 </section>
 </section>
@@ -305,7 +269,7 @@ Figure&nbsp;7: Gas efficiency ratio: current year vs.&nbsp;predicted band
 </ul>
 <section id="time-of-compilation" class="level3">
 <h3 class="anchored" data-anchor-id="time-of-compilation">Time of compilation</h3>
-<p>2026-03-26 05:59:28.567428</p>
+<p>2026-03-28 15:02:35.56157</p>
 </section>
 </section>
 </section>

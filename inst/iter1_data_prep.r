@@ -9,7 +9,7 @@
 #
 # Produces: data/meteostat_data.Rdata
 #   Contains: meteostat_weather, obs_hours, obs_readings,
-#             obs_days, obs_days_complete, jelleggorb,
+#             obs_days, obs_days_complete,
 #             get_approx_meter, get_approx_rate, get_avg_temp
 # ------------------------------------------------------------
 
@@ -29,15 +29,62 @@ source_all_files <- function(directory) {
 }
 source_all_files(here::here("R"))
 
-# --- Optional: pull fresh weather data from Meteostat API ---
-# Uncomment to query the latest daily weather data.
-# Requires API key in inst/extdata/secrets/meteostat_api_key.txt
-#
-# meteostat_query_daily(
-#   station   = "12843",
-#   end_date  = Sys.Date(),
-#   days_back = 365
-# )
+# --- Auto-query fresh weather data if DB is stale ---
+# Check the latest date in existing Excel files. If it
+# doesn't cover yesterday, pull fresh data from Meteostat.
+existing_files <- list.files(
+  here::here("inst", "extdata", "meteostat_data"),
+  pattern = "\\.xlsx$", full.names = TRUE
+)
+
+if (length(existing_files) > 0) {
+  # Peek at the most recently modified file's max date
+  newest_file <- existing_files[
+    which.max(file.mtime(existing_files))
+  ]
+  latest_date <- tryCatch({
+    tmp <- readxl::read_excel(newest_file)
+    max(as.Date(tmp[[1]]), na.rm = TRUE)
+  }, error = function(e) as.Date(NA))
+} else {
+  latest_date <- as.Date(NA)
+}
+
+# Query if we're missing more than 2 days
+if (is.na(latest_date) ||
+    latest_date < (Sys.Date() - 2)) {
+  message(
+    "Weather data ends at ",
+    ifelse(is.na(latest_date), "(none)", as.character(latest_date)),
+    ". Querying Meteostat for fresh data..."
+  )
+  # Pull from the day after latest_date to today
+  start_from <- if (is.na(latest_date)) {
+    Sys.Date() - 365
+  } else {
+    latest_date
+  }
+  days_to_pull <- as.numeric(Sys.Date() - start_from)
+  tryCatch({
+    meteostat_query_daily(
+      station   = "12843",
+      end_date  = Sys.Date(),
+      days_back = max(days_to_pull, 30),
+      overwrite = TRUE
+    )
+    message("Fresh weather data saved.")
+  }, error = function(e) {
+    warning(
+      "Meteostat query failed: ", e$message,
+      "\nProceeding with existing data."
+    )
+  })
+} else {
+  message(
+    "Weather data is current (latest: ",
+    latest_date, "). Skipping API query."
+  )
+}
 
 # --- Run the main data pipeline ---
 # Reads all Excel weather files + gaz.xlsx, merges, transforms,
@@ -72,9 +119,9 @@ message("Meter readings:  ", nrow(obs_readings))
 message("Daily obs:       ", nrow(obs_days))
 message("Complete daily:  ", nrow(obs_days_complete))
 message("Hourly obs:      ", nrow(obs_hours))
-message(
-  "Latest reading:  ",
-  obs_readings %>%
-    dplyr::slice_tail(n = 1) %>%
-    dplyr::pull(Date)
-)
+latest_obs <- obs_readings %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(Date) %>%
+  dplyr::slice_tail(n = 1) %>%
+  dplyr::pull(Date)
+message("Latest reading:  ", format(latest_obs, "%Y-%m-%d"))
