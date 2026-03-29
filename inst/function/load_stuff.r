@@ -27,8 +27,6 @@ source_all_files(here::here("R"))
 # Core data: weather + gas observations + interpolated objects
 load(here::here("data", "meteostat_data.Rdata"))
 
-# Weather models: GLS temperature models + 100-year simulation
-# (produced by iter2_weather_models.r)
-if (file.exists(here::here("data", "weather_models.Rdata"))) {
-  load(here::here("data", "weather_models.Rdata"))
-}
+# NOTE: weather_models.Rdata (GLS + simulation) is NOT part
+# of the core pipeline.  See inst/weathermodels/ for standalone
+# weather modeling scripts if needed.

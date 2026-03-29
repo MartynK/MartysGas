@@ -66,7 +66,20 @@
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"library\\(readxl\\); d <- read_excel\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/inst/extdata/gaz.xlsx'', sheet=''Mero_rendetlen''\\); print\\(tail\\(d, 3\\)\\); cat\\(''Cols:'', paste\\(colnames\\(d\\), collapse='', ''\\), ''\\\\n''\\)\")",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_add_reading.r)",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/weather_models.Rdata''\\); cat\\(''Cols:'', paste\\(colnames\\(weather_simulated\\), collapse='', ''\\), ''\\\\n''\\); cat\\(''Rows:'', nrow\\(weather_simulated\\), ''\\\\n''\\); print\\(head\\(weather_simulated, 3\\)\\)\")",
-      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_predictions.Rdata''\\); cat\\(''CONF_LEV:'', CONF_LEV, ''\\\\n''\\)\")"
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_predictions.Rdata''\\); cat\\(''CONF_LEV:'', CONF_LEV, ''\\\\n''\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_diag.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_models.Rdata''\\); cat\\(''sds cols:'', paste\\(colnames\\(sds\\), collapse='', ''\\), ''\\\\n''\\); cat\\(''sds rows:'', nrow\\(sds\\), ''\\\\n''\\); print\\(sds[c\\(1,87,180,270,365\\), c\\(''day_in_year'',''mean_pred'',''sd_pred'',''cor_z''\\)]\\)\")",
+      "Bash(grep -rn \"weather_simulated\\\\|simulate_weather\\\\|weather_models\\\\.Rdata\\\\|sim_cumheat\\\\|sim_mat\\\\|sim_wide\\\\|year_sim\\\\|pred_tavg\\\\|pred_range\" /c/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/inst --include=*.r --include=*.R)",
+      "Bash(mv iter3_consumption_curves.r iter2_consumption_curves.r)",
+      "Bash(mv iter4_cumulative_heat_model.r iter3_cumulative_heat_model.r)",
+      "Bash(mv iter5_conditional_prediction.r iter4_conditional_prediction.r)",
+      "Bash(mv iter6_decision_tool.r iter5_decision_tool.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter2_consumption_curves.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter3_cumulative_heat_model.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter4_conditional_prediction.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter5_decision_tool.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_models.Rdata''\\); library\\(dplyr\\); obs_days_complete %>% filter\\(Spent > 0\\) %>% group_by\\(year\\) %>% summarise\\(n=n\\(\\), min_day=min\\(day_in_year\\), max_day=max\\(day_in_year\\), max_spent=round\\(max\\(Spent,na.rm=TRUE\\)\\)\\) %>% print\\(n=30\\)\")",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_check_meter.r)"
     ],
     "deny": []
   }

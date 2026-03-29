@@ -121,15 +121,18 @@ merge_transform_weather <- function(data_dir, gaz_dir, output_file,
   # extract last date to truncate result
   last_reading <- obs_readings %>% slice_tail(n=1) %>% pull(Date)
   
+  # Build a monotonic cumulative meter series (Value_trf).
+  # Detect meter changes by a large DROP in Value (>500 m3).
+  # When that happens, carry forward the previous cumulative
+  # total and add the new meter's reading on top.
   obs_readings$Value_trf <- 0
   for (i in 1:nrow(obs_readings)) {
     if (i == 1) {
-      delta   <- - obs_readings$Value[1]
-    }  else if ( obs_readings$Value[i] == 0 ) {
-      # Counter restarts due to meter change
-      delta <- obs_readings$Value_trf[i-1]
+      delta <- -obs_readings$Value[1]
+    } else if (obs_readings$Value[i] < obs_readings$Value[i - 1] - 500) {
+      # Meter replaced — large drop in raw Value
+      delta <- obs_readings$Value_trf[i - 1]
     }
-    
     obs_readings$Value_trf[i] <- obs_readings$Value[i] + delta
   }
 

@@ -292,69 +292,85 @@ if (length(gas_remaining_now) == 0 || is.na(gas_remaining_now)) {
   gas_remaining_now <- gas_budget_left
 }
 
-# Predicted burn-down: proper Monte Carlo from weather_simulated
+# Predicted burn-down: ANALYTIC conditional normal
 #
-# Each of the 100 simulated years gives a trajectory of
-# daily heat need from today → Dec 31.  Cumulative gas use
-# per trajectory grows monotonically, so the spread of
-# trajectories naturally widens over time.  We take quantiles
-# across trajectories at each future day.
+# We already have everything we need from iter4's real data:
+#   sds$mean_pred — GLS-smoothed mean of cumulative heat at each day
+#   sds$sd_pred   — smoothed SD across 20+ observed years
+# We compute rho(today, d) empirically from obs_days_complete.
+#
+# Conditional normal:
+#   z0 = (h0 - mu_today) / sigma_today
+#   E[H(d)|h0] = mu(d) + rho(today,d) * sigma(d) * z0
+#   SD[H(d)|h0] = sigma(d) * sqrt(1 - rho(today,d)^2)
+#
+# Bands are symmetric (mean ± z * SD), and widen monotonically
+# because rho drops as d moves further from today.
 
-# weather_simulated has: day_in_year, year_sim, pred_tavg
-# Daily heat need = max(0, 20 - pred_tavg)
-HEAT_THRESHOLD <- 20
-weather_simulated$daily_heat <- pmax(
-  0, HEAT_THRESHOLD - weather_simulated$pred_tavg
-)
-
-# For each simulated year, extract days from today's yday
-# to day 365, then cumulate the heat -> gas trajectory
-future_days <- seq(day_in_year_obs, 365)
-n_future <- length(future_days)
-
-sim_years <- unique(weather_simulated$year_sim)
-# Pre-allocate a matrix: rows = future days, cols = sim years
-gas_remaining_matrix <- matrix(
-  NA_real_,
-  nrow = n_future,
-  ncol = length(sim_years)
-)
-
-for (i in seq_along(sim_years)) {
-  sy <- sim_years[i]
-  sim_dat <- weather_simulated[
-    weather_simulated$year_sim == sy, ]
-
-  # Get daily heat for the remaining portion of this sim year
-  sim_future <- sim_dat[
-    sim_dat$day_in_year %in% future_days, ]
-
-  if (nrow(sim_future) < n_future) next
-
-  # Order by day and compute cumulative gas consumption
-  sim_future <- sim_future[order(sim_future$day_in_year), ]
-  cum_gas_use <- cumsum(
-    sim_future$daily_heat * efficiency_ratio +
-      HOTWATER_PER_DAY
+# Step 1: Pivot real data to wide matrix (rows = years, cols = days)
+obs_wide <- obs_days_complete %>%
+  dplyr::filter(day_in_year <= 365) %>%
+  dplyr::select(year, day_in_year, tavg_low_cumul) %>%
+  dplyr::group_by(year, day_in_year) %>%
+  dplyr::summarise(
+    tavg_low_cumul = max(tavg_low_cumul, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from  = day_in_year,
+    values_from = tavg_low_cumul,
+    names_prefix = "d"
   )
-  gas_remaining_matrix[, i] <- gas_remaining_now - cum_gas_use
-}
+obs_mat <- as.matrix(obs_wide[, -1])  # years × days
 
-# Compute quantiles across simulated trajectories
-# (each row = one future day, quantile across columns)
-# CONF_LEV is a z-score (e.g. 1.96), convert to probability
-ALPHA <- pnorm(-CONF_LEV)  # e.g. 0.025 for z=1.96
+# Step 2: Get mu(d) and sigma(d) from the GLS model (sds)
+# These are smooth and well-behaved (fit to 20+ years)
+mu_vec    <- sds$mean_pred[1:365]
+sigma_vec <- sds$sd_pred[1:365]
+
+# Step 3: Current position and z-score
+mu_today    <- mu_vec[day_in_year_obs]
+sigma_today <- sigma_vec[day_in_year_obs]
+z0 <- (cum_heat_now - mu_today) / sigma_today
+
+# Step 4: Empirical correlation rho(today, d) from real years
+today_vec <- obs_mat[, day_in_year_obs]
+future_days <- seq(day_in_year_obs, 365)
+
+rho_vec <- cor(
+  today_vec,
+  obs_mat[, future_days],
+  use = "pairwise.complete.obs"
+)[1, ]
+# Replace any NA with the last valid rho (edge days)
+rho_vec[is.na(rho_vec)] <- 0.5
+
+# Step 5: Conditional distribution at each future day
+cond_mean <- mu_vec[future_days] +
+  rho_vec * sigma_vec[future_days] * z0
+cond_sd <- sigma_vec[future_days] *
+  sqrt(pmax(0, 1 - rho_vec^2))
+
+# Step 6: Convert to gas remaining
+# Additional heat from today to day d (conditional)
+delta_heat_mean <- cond_mean - cum_heat_now
+days_from_now   <- future_days - day_in_year_obs
+delta_gas_mean  <- efficiency_ratio * delta_heat_mean +
+  HOTWATER_PER_DAY * days_from_now
+delta_gas_sd    <- efficiency_ratio * cond_sd
+
+# Gas remaining = current budget minus expected consumption
+# Bands are symmetric: mean ± z * SD
 dat_forecast <- data.frame(
   day_in_year       = future_days,
-  gas_forecast_lwr  = apply(
-    gas_remaining_matrix, 1,
-    quantile, probs = ALPHA, na.rm = TRUE),
-  gas_forecast_upr  = apply(
-    gas_remaining_matrix, 1,
-    quantile, probs = 1 - ALPHA, na.rm = TRUE),
-  gas_forecast_mean = apply(
-    gas_remaining_matrix, 1,
-    mean, na.rm = TRUE)
+  gas_forecast_mean = gas_remaining_now - delta_gas_mean,
+  gas_forecast_lwr  = gas_remaining_now - delta_gas_mean -
+    CONF_LEV * delta_gas_sd,
+  gas_forecast_upr  = gas_remaining_now - delta_gas_mean +
+    CONF_LEV * delta_gas_sd,
+  # Diagnostics
+  cond_sd_heat     = cond_sd,
+  rho_with_today   = rho_vec
 )
 
 # Convert day_in_year to actual Date using lubridate

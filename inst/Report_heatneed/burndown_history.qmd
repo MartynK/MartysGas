@@ -1,0 +1,128 @@
+---
+title: "Historical gas budget burn-down"
+format: html
+editor: visual
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+load(here::here("data", "cumulative_heat_models.Rdata"))
+
+QUOTA_M3 <- 1729
+
+# Per-year gas consumption (Spent resets ~0 each Jan)
+# Drop years with <100 obs or obvious data errors (>5000 m3)
+dat_years <- obs_days_complete %>%
+  filter(Spent > 0) %>%
+  group_by(year) %>%
+  mutate(
+    gas_this_year = Spent - min(Spent, na.rm = TRUE),
+    gas_remaining = QUOTA_M3 - gas_this_year,
+    plot_date     = make_date(year, 1, 1) +
+      days(day_in_year - 1)
+  ) %>%
+  ungroup()
+
+# Filter to usable years
+year_stats <- dat_years %>%
+  group_by(year) %>%
+  summarise(
+    n_obs       = n(),
+    max_gas     = max(gas_this_year, na.rm = TRUE),
+    .groups     = "drop"
+  ) %>%
+  filter(n_obs >= 100, max_gas < 5000)
+
+dat_years <- dat_years %>%
+  filter(year %in% year_stats$year)
+```
+
+# Calendar burn-down by year
+
+Each panel shows gas budget remaining (1729 m³ − consumed) over the calendar year. The red dashed line marks the quota boundary — dropping below zero means exceeding the subsidized limit.
+
+```{r fig-burndown-facet}
+#| fig-cap: "Gas budget burn-down by year"
+#| fig-height: 8
+#| fig-width: 10
+
+dat_years %>%
+  ggplot(aes(x = plot_date, y = gas_remaining)) +
+  theme_bw() +
+  geom_line(color = "navy", linewidth = 0.8) +
+  geom_hline(yintercept = 0, color = "red",
+             linetype = "dashed") +
+  facet_wrap(~ year, scales = "free_x", ncol = 2) +
+  scale_x_date(date_breaks = "3 months",
+               date_labels = "%b") +
+  labs(
+    x     = "",
+    y     = "Gas budget remaining (m\u00b3)",
+    title = "Annual gas budget burn-down"
+  )
+```
+
+# Heat need vs. gas consumed
+
+Alternative parametrisation: x-axis is cumulative heating need (°C·days), y-axis is gas consumed (m³). Each year traces a curve from the origin. The diagonal represents the efficiency ratio — steeper means more gas per degree-day. The black box marks the annual quota (1729 m³) against the typical annual heat need (~3300 °C·days).
+
+```{r fig-heat-vs-gas-facet}
+#| fig-cap: "Gas consumed as a function of cumulative heat need"
+#| fig-height: 8
+#| fig-width: 10
+
+# Heat need also needs to be per-year
+dat_heat_gas <- dat_years %>%
+  filter(tavg_low_cumul > 0, gas_this_year > 0)
+
+dat_heat_gas %>%
+  ggplot(aes(x = tavg_low_cumul, y = gas_this_year,
+             color = factor(year))) +
+  theme_bw() +
+  geom_line(linewidth = 0.8) +
+  # Quota ceiling
+  geom_hline(yintercept = QUOTA_M3, color = "black",
+             linetype = "dashed", linewidth = 0.8) +
+  # Typical end-of-year heat need marker
+  geom_vline(xintercept = 3300, color = "grey50",
+             linetype = "dotted") +
+  labs(
+    x     = "Cumulative heating need (\u00b0C\u00b7days)",
+    y     = "Gas consumed (m\u00b3)",
+    color = "Year",
+    title = "Gas consumption vs. cumulative heat need"
+  )
+```
+
+Same data faceted by year for clarity:
+
+```{r fig-heat-vs-gas-individual}
+#| fig-cap: "Gas consumed vs. heat need (per year)"
+#| fig-height: 8
+#| fig-width: 10
+
+dat_heat_gas %>%
+  ggplot(aes(x = tavg_low_cumul, y = gas_this_year)) +
+  theme_bw() +
+  geom_line(color = "darkgreen", linewidth = 0.8) +
+  geom_hline(yintercept = QUOTA_M3, color = "red",
+             linetype = "dashed") +
+  # Ideal efficiency slope (quota / typical annual heat)
+  geom_abline(
+    slope     = QUOTA_M3 / 3300,
+    intercept = 0,
+    color     = "salmon", linetype = "dotted",
+    linewidth = 0.8
+  ) +
+  facet_wrap(~ year, ncol = 2) +
+  labs(
+    x     = "Cumulative heating need (\u00b0C\u00b7days)",
+    y     = "Gas consumed (m\u00b3)",
+    title = "Heat need vs. gas: ideal slope (dotted) vs. actual"
+  )
+```
+
+The dotted salmon line in each panel represents the "ideal" efficiency: consuming exactly 1729 m³ for ~3300 °C·days of annual heat. Years where the green line runs above the salmon line are burning gas faster than the budget allows; below means headroom.
