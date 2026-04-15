@@ -67,7 +67,7 @@ dat_years %>%
 
 # Heat need vs. gas consumed
 
-Alternative parametrisation: x-axis is cumulative heating need (°C·days), y-axis is gas consumed (m³). Each year traces a curve from the origin. The diagonal represents the efficiency ratio — steeper means more gas per degree-day. The black box marks the annual quota (1729 m³) against the typical annual heat need (~3300 °C·days).
+Alternative parametrisation: x-axis is cumulative heating need (°C·days), y-axis is gas consumed (m³). Each year traces a curve from the origin. The diagonal represents the efficiency ratio — steeper means more gas per degree-day. The black box marks the annual quota (1729 m³) against the typical annual heat need (\~3300 °C·days).
 
 ```{r fig-heat-vs-gas-facet}
 #| fig-cap: "Gas consumed as a function of cumulative heat need"
@@ -125,4 +125,4 @@ dat_heat_gas %>%
   )
 ```
 
-The dotted salmon line in each panel represents the "ideal" efficiency: consuming exactly 1729 m³ for ~3300 °C·days of annual heat. Years where the green line runs above the salmon line are burning gas faster than the budget allows; below means headroom.
+The dotted salmon line in each panel represents the "ideal" efficiency: consuming exactly 1729 m³ for \~3300 °C·days of annual heat. Years where the green line runs above the salmon line are burning gas faster than the budget allows; below means headroom.
