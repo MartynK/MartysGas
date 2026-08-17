@@ -1,57 +1,232 @@
 ---
-title: "Heating needs"
+title: "Gas budget dashboard"
+subtitle: "Should I amp up, hold steady, or dial down this week?"
 author: "Márton Kiss, MD"
+date: today
 format:
-  docx:
-    fig-width: 6
-    fig-height: 4
-    reference-doc: custom_ref_doc.docx
-  html: default
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    toc-title: "Jump to"
+    page-layout: full
+    fig-width: 9
+    fig-height: 5.2
+    code-fold: true
+    embed-resources: true
 editor: visual
-prefer-html: true
-toc: true
-toc-depth: 2
 execute:
   echo: false
   warning: false
+  message: false
 ---
 
 ```{r setup}
 # Load packages, functions, and core data
 source(here::here("inst", "function", "load_stuff.r"))
 
-# Load analysis outputs (produced by iter4-iter6 pipeline)
-if (file.exists(here::here("data", "cumulative_heat_models.Rdata"))) {
-  load(here::here("data", "cumulative_heat_models.Rdata"))
+# Analysis outputs (produced by the iter1-iter5 pipeline)
+load(here::here("data", "cumulative_heat_models.Rdata"))
+load(here::here("data", "cumulative_heat_predictions.Rdata"))
+load(here::here("data", "decision_snapshot.Rdata"))
+
+ds <- decision_snapshot
+
+# Helper: round + format a number with a unit
+fmt <- function(x, unit = "", digits = 0) {
+  paste0(formatC(round(x, digits), format = "f",
+                 big.mark = " ", digits = digits), unit)
 }
-if (file.exists(here::here("data", "cumulative_heat_predictions.Rdata"))) {
-  load(here::here("data", "cumulative_heat_predictions.Rdata"))
+
+# Colour-code the verdict
+verdict_col <- switch(
+  ds$decision,
+  "AMP UP"      = "#2e7d32",  # green: room to spare
+  "HOLD STEADY" = "#f9a825",  # amber: tight
+  "DIAL DOWN"   = "#c62828",  # red: at risk
+  "#555555"
+)
+```
+
+```{r verdict-banner, results = "asis"}
+# A prominent, plain-language verdict banner. This is the
+# single most important takeaway in the whole report.
+cat(sprintf('
+<div style="border-left: 10px solid %s; background: %s14;
+            padding: 18px 22px; border-radius: 6px;
+            margin: 8px 0 24px 0;">
+  <div style="font-size: 0.85em; letter-spacing: 1px;
+              text-transform: uppercase; color: #777;">
+    This week&rsquo;s recommendation
+  </div>
+  <div style="font-size: 2.1em; font-weight: 700;
+              color: %s; line-height: 1.1; margin: 4px 0;">
+    %s
+  </div>
+  <div style="font-size: 1.05em; color: #333;">%s</div>
+</div>',
+  verdict_col, verdict_col, verdict_col,
+  ds$decision, ds$decision_detail))
+```
+
+## The burn-down chart
+
+This is the heart of the report. It answers one question:
+**will the year&rsquo;s subsidised gas allowance (1 729 m³) last
+until December 31?**
+
+```{r burndown, fig.height = 5.4}
+fig_burndown
+```
+
+::: {.callout-tip collapse="false"}
+## How to read this chart
+
+- **Solid navy line** &mdash; gas budget actually remaining,
+  reconstructed from your meter readings. This part is
+  *certain*: it already happened.
+- **Dashed red line** &mdash; the *expected* trajectory for the
+  rest of the year, based on 30 years of weather and your
+  current consumption efficiency.
+- **Shaded pink band** &mdash; the 95 % range of outcomes. It is
+  narrow now and **fans out toward winter**, because the single
+  biggest unknown is *how cold the coming heating season will
+  be*. A mild autumn keeps you near the top of the band; a harsh
+  one pushes you toward the bottom.
+- **Red horizontal line (0 m³)** &mdash; the quota boundary.
+  Anything below it is gas billed at the **penalty price**
+  (~7.5&times; the subsidised rate).
+:::
+
+## Where the budget stands today
+
+```{r status-table}
+library(knitr)
+
+status_tbl <- data.frame(
+  Metric = c(
+    "Tracking window",
+    "Days elapsed",
+    "Gas consumed since Jan 1",
+    "Gas remaining in quota",
+    "Expected need for rest of year (95% CI)",
+    "Projected year-end balance (95% CI)",
+    "Chance of overshooting the quota",
+    "Current daily rate (latest meter interval)",
+    "Daily rate to stay on budget"
+  ),
+  Value = c(
+    sprintf("Jan 1 &ndash; Dec 31, %d", ds$current_year),
+    sprintf("%d of %d", round(ds$days_elapsed),
+            round(ds$days_elapsed + ds$days_remaining)),
+    fmt(ds$gas_consumed, " m³"),
+    fmt(ds$gas_budget_left, " m³"),
+    sprintf("%s &ndash; %s",
+            fmt(ds$gas_need["lower"], " m³"),
+            fmt(ds$gas_need["upper"], " m³")),
+    sprintf("%s (%s to %s)",
+            fmt(ds$forecast_year_end["mean"], " m³"),
+            fmt(ds$forecast_year_end["lower"], " m³"),
+            fmt(ds$forecast_year_end["upper"], " m³")),
+    sprintf("~%d%%", round(ds$prob_overshoot)),
+    fmt(ds$current_daily_rate, " m³/day", 2),
+    sprintf("%s &ndash; %s",
+            fmt(ds$daily_rate_suggested["lower"], "", 2),
+            fmt(ds$daily_rate_suggested["upper"], " m³/day", 2))
+  ),
+  check.names = FALSE
+)
+
+kable(status_tbl, escape = FALSE, align = c("l", "r"))
+```
+
+```{r hp-note, results = "asis"}
+# Heat-pump hint when it is warm enough for the AC to win
+if (!is.na(ds$recent_tavg) && ds$recent_tavg > 10) {
+  cat(sprintf('
+::: {.callout-note}
+Recent 3-day average outdoor temperature is **%.1f&nbsp;°C**
+(above 10&nbsp;°C). The heat pump is the cheaper way to add
+heat right now &mdash; save the discounted gas for the cold
+months.
+:::', ds$recent_tavg))
 }
-if (file.exists(here::here("data", "decision_snapshot.Rdata"))) {
-  load(here::here("data", "decision_snapshot.Rdata"))
-}
 ```
 
-```{r, child = here::here("inst", "Report_heatneed", "child1_preamble.qmd")}
+# Supporting detail {#supporting}
+
+The verdict above is driven by two ideas: (1) how much *heating
+need* is still ahead of us, and (2) how much *gas* we burn per
+unit of heating need. The next two charts show each.
+
+## Efficiency: gas burned per unit of heating need
+
+We track gas used per °C·day of heating need. If this ratio
+holds steady, we can convert a weather forecast into a gas
+forecast. The grey band is the predicted efficiency corridor
+for the remainder of the year.
+
+```{r fig-efficiency}
+fig_efficiency_ratio
 ```
 
-\newpage
+## How predictable is the rest of the year?
 
-```{r, child = here::here("inst", "Report_heatneed", "child2.qmd")}
+Early in the year, the final heating total is highly uncertain.
+As the season unfolds, today&rsquo;s running total becomes a
+better and better predictor of where we will end up &mdash;
+which is why the burn-down band narrows as winter approaches.
+
+```{r fig-bands}
+fig_conditional_bands
 ```
 
-\newpage
+# Methodology {#methodology}
 
-# Remarks
+::: {.callout-note collapse="true"}
+## Modelling notes (click to expand)
 
-### Other information regarding the document's compilation
+**Heating need.** Assuming a constant indoor target of 20 °C and
+heat loss proportional to the indoor&ndash;outdoor temperature
+gap, we sum the "missing degrees" below 20 °C each day to get a
+**cumulative heating need** in °C·days.
 
-```{r, comment='', results='asis'}
-sessionInfo() %>% report::report() %>% cat()
-```
+**Weather model.** A GLS model with a natural spline (8 df)
+captures the seasonal mean of cumulative heating need across
+~30 years of Budapest weather (station 12843). An exponential
+variance structure lets the spread grow through the year.
 
-### Time of compilation
+**Conditional forecast.** Given the heating need observed *so
+far this year*, the end-of-year total is forecast with a
+conditional-normal model: the correlation between today&rsquo;s
+running total and each future day (estimated empirically across
+years) shrinks the uncertainty band the further into the season
+we are.
 
-```{r last_chunk, results='asis'}
-Sys.time() %>% as.character() %>% cat()
+**Gas from heat.** Gas use is split into two parts: a per-day
+**hot-water baseline** (present even when no heating is needed)
+and **heating gas** proportional to the cumulative heating
+need. The baseline is estimated from this year&rsquo;s data as
+the marginal gas-per-day controlling for heat need; when that
+estimate is unreliable (collinear within a single winter, so
+it can even go negative) it falls back to a dedicated
+0.4&nbsp;m³/day. The same baseline and heating efficiency feed
+both the burn-down and the efficiency chart.
+
+**Budget window.** Tracking runs on the **calendar year
+(Jan 1 &ndash; Dec 31)**, anchored to the meter value
+interpolated at Jan 1. (The official subsidised-quota year is
+Aug&ndash;Jul, but the practical átalány true-up happens in
+early January, so the calendar year is the relevant window
+here.)
+
+**Pipeline.** `iter1` (data prep) → `iter2` (consumption
+curves) → `iter3` (cumulative heat model) → `iter4` (conditional
+prediction) → `iter5` (decision tool). Re-run after each new
+meter reading.
+:::
+
+```{r compile-time, results = "asis"}
+cat("\n\n*Compiled ",
+    as.character(Sys.time()), ".*", sep = "")
 ```

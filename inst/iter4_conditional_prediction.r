@@ -21,8 +21,10 @@ load(here::here("data", "cumulative_heat_models.Rdata"))
 # 1. Constants
 # ============================================================
 
-# Current year -- should match iter4
-ACT_YEAR <- 2025
+# Current year. Track the calendar year we are actually in,
+# rather than a hard-coded value that silently leaves the
+# report showing last year's data.
+ACT_YEAR <- lubridate::year(Sys.Date())
 
 # Current calendar year for filtering
 act_year <- ACT_YEAR
@@ -180,21 +182,70 @@ predict_future_needs <- function(
 
 
 # ============================================================
-# 5. Prediction intervals and efficiency ratios
+# 5. Hot-water baseline + prediction intervals + efficiency
 # ============================================================
 
-# 95% CI for remaining heat need
+# --- Hot-water (non-heating) baseline ---------------------
+# Gas use has two parts: a per-day baseline (hot water, cooking)
+# that exists even when there is no heating need, plus heating
+# gas proportional to the cumulative heating need. We try to
+# learn the baseline from this year's data as the marginal gas
+# per DAY, holding cumulative heat constant:
+#     Spent ~ day_in_year + tavg_low_cumul
+# the day_in_year coefficient is the baseline (m3/day).
+#
+# Within a single Jan-Jun window day_in_year and cumulative
+# heat are strongly collinear, so this estimate is often
+# unreliable (it can even come out negative). When it is not a
+# sane value (>= 0.5 m3/day) we fall back to the dedicated
+# hot-water figure of 0.4 m3/day.
+HOTWATER_DEFAULT <- 0.4
+
+dat_baseline_fit <- obs_days_complete %>%
+  filter(year == ACT_YEAR, !is.na(Spent),
+         !is.na(tavg_low_cumul))
+
+hotwater_baseline <- tryCatch({
+  mod_baseline <- lm(
+    Spent ~ day_in_year + tavg_low_cumul,
+    data = dat_baseline_fit
+  )
+  unname(coef(mod_baseline)["day_in_year"])
+}, error = function(e) NA_real_)
+
+if (is.na(hotwater_baseline) || hotwater_baseline < 0.5) {
+  message(
+    "Estimated hot-water baseline = ",
+    ifelse(is.na(hotwater_baseline), "NA",
+           round(hotwater_baseline, 3)),
+    " m3/day (< 0.5). Using dedicated ",
+    HOTWATER_DEFAULT, " m3/day."
+  )
+  hotwater_baseline <- HOTWATER_DEFAULT
+} else {
+  message(
+    "Using data-driven hot-water baseline = ",
+    round(hotwater_baseline, 3), " m3/day."
+  )
+}
+
+# 95% CI for remaining heat need + HEAT-ONLY efficiency
 obs_days_complete <- obs_days_complete %>%
   mutate(
     tavgcum_pred_lwr = tavgl_left_pred -
       CONF_LEV * tavgl_left_pred_sd,
     tavgcum_pred_upr = tavgl_left_pred +
       CONF_LEV * tavgl_left_pred_sd,
-    # Efficiency ratio: gas spent per degree of heating need
-    spent_tavg = Spent / tavg_low_cumul,
-    # Gas budget remaining (0.4 m3/day hot water baseline)
-    gas_left = 1730 - 0.4 * (365 - day_in_year) - Spent,
-    # Suggested rate for the rest of the season
+    # Heating efficiency: gas spent on HEATING (total minus the
+    # hot-water baseline) per degree*day of heating need.
+    spent_tavg = (Spent - hotwater_baseline * day_in_year) /
+      tavg_low_cumul,
+    # Budget left for HEATING: quota minus gas spent so far
+    # minus the hot water still to come this year. Measured on
+    # the same heat-only basis as spent_tavg above.
+    gas_left = 1729 - Spent -
+      hotwater_baseline * (365 - day_in_year),
+    # Break-even heating efficiency for the rest of the season
     spent_tavg_left_mean = gas_left / tavgl_left_pred,
     spent_tavg_left_upr  = gas_left / tavgcum_pred_upr,
     spent_tavg_left_lwr  = gas_left / tavgcum_pred_lwr
@@ -266,6 +317,10 @@ fig_efficiency_ratio <-
     color = "grey70",
     linetype = "dashed", linewidth = 1.2
   ) +
+  geom_vline(
+    xintercept = as.POSIXct(Sys.Date()),
+    color = "grey50", linetype = "dotted"
+  ) +
   scale_y_continuous(limits = c(0, 1)) +
   scale_x_datetime(
     date_breaks = "1 month",
@@ -274,7 +329,14 @@ fig_efficiency_ratio <-
   ) +
   labs(
     x = "",
-    y = "Gas efficiency (m3 / C*day)"
+    y = "Gas efficiency (m3 / C*day)",
+    title = paste0("Gas efficiency in ", year_lim,
+                   " (solid = actual so far)"),
+    subtitle = paste0(
+      "Coloured line = this year to date; dashed grey = ",
+      "predicted efficiency corridor. Right of the dotted ",
+      "line is still ahead."
+    )
   )
 
 # Conditional prediction bands figure
@@ -323,7 +385,7 @@ save(
   sds,
   tavgcum_exp, tavgcum_exp_sd,
   fig_efficiency_ratio, fig_conditional_bands,
-  ACT_YEAR, CONF_LEV,
+  ACT_YEAR, CONF_LEV, hotwater_baseline,
   file = here::here(
     "data", "cumulative_heat_predictions.Rdata"
   )

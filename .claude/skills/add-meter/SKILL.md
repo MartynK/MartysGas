@@ -33,7 +33,7 @@ Example:
 Execute the bundled R script which reads the txt, appends to gaz.xlsx, and reruns the pipeline:
 
 ```bash
-"C:/Program Files/R/R-4.5.2/bin/Rscript.exe" .claude/skills/add-meter/scripts/add_and_rerun.r
+"C:/Program Files/R/R-4.6.0/bin/Rscript.exe" .claude/skills/add-meter/scripts/add_and_rerun.r
 ```
 
 Run this from the project root (`C:\Users\mrkma\OneDrive\DKM\Stats_R\R\MartysGas`). The script:

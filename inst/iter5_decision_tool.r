@@ -34,7 +34,16 @@ PRICE_PENALTY    <- 767    # HUF/m3 above quota
 HP_THRESHOLD     <- 10     # Outdoor C above which heat pump wins
 QUOTA_START_MONTH <- 8     # August
 QUOTA_START_DAY   <- 1
-HOTWATER_PER_DAY  <- 0.4   # m3/day baseline for hot water
+# Hot-water (non-heating) baseline, m3/day. iter4 estimates
+# this from the data and falls back to 0.4 when the estimate
+# is unreliable; reuse exactly that value so the decision tool
+# and the efficiency chart share one definition.
+HOTWATER_PER_DAY <- if (exists("hotwater_baseline") &&
+                        !is.na(hotwater_baseline)) {
+  hotwater_baseline
+} else {
+  0.4
+}
 
 
 # ============================================================
@@ -70,16 +79,21 @@ dat_latest_reading <- obs_readings %>%
   arrange(Date) %>%
   slice_tail(n = 1)
 
-# Meter value near Jan 5 of current year (the atalany anchor)
-dat_jan_reading <- obs_readings %>%
-  ungroup() %>%
-  filter(year(Date) == current_year) %>%
-  mutate(err_jan = abs(yday(Date) - 5)) %>%
-  filter(err_jan == min(err_jan)) %>%
-  slice(1)
-
+# Budget anchor: the meter value at Jan 1 of the current
+# calendar year (the tracking window is Jan-Dec).
+#
+# NOTE: a previous version anchored to "the meter reading
+# nearest Jan 5". When no early-January reading exists (the
+# usual case -- e.g. the first 2026 reading is Feb 2), that
+# silently anchored to a much later reading and DROPPED all
+# of January's consumption, overstating the remaining budget
+# by hundreds of m3. We instead interpolate the meter at
+# Jan 1 with get_approx_meter(), which is exactly how the
+# burndown's `Spent` is defined -- keeping the headline
+# numbers and the burndown chart consistent.
+year_start_meter <- as.POSIXct(paste0(current_year, "-01-01"))
 meter_now       <- dat_latest_reading$Value_trf
-meter_at_jan    <- dat_jan_reading$Value_trf
+meter_at_jan    <- get_approx_meter(year_start_meter)
 gas_consumed    <- meter_now - meter_at_jan
 gas_budget_left <- QUOTA_M3 - gas_consumed
 
@@ -137,8 +151,13 @@ remaining_heat_upper <- max(remaining_heat_upper, 0)
 # 6. Translate heat need to gas need
 # ============================================================
 
-# Efficiency ratio: how many m3 of gas per degree*day of
-# heating need, estimated from current season data
+# Heating efficiency: gas spent on HEATING (total gas minus
+# the per-day hot-water baseline) per degree*day of heating
+# need. Hot water is handled by the separate HOTWATER_PER_DAY
+# baseline (data-driven in iter4, 0.4 fallback), NOT bundled
+# into this ratio -- so the forecast keeps using hot water
+# through the summer when heating need is ~0. Uses the same
+# basis as the iter4 efficiency chart's spent_tavg.
 if (cum_heat_now > 0 && !is.na(dat_current$Spent)) {
   gas_heating_spent <- dat_current$Spent -
     HOTWATER_PER_DAY * day_in_year_obs
@@ -148,7 +167,9 @@ if (cum_heat_now > 0 && !is.na(dat_current$Spent)) {
   efficiency_ratio <- 0.53
 }
 
-# Expected gas remaining for heating
+# Expected gas need for the rest of the year = heating gas
+# (efficiency x remaining heat) + hot water for the remaining
+# days.
 gas_need_lower <- remaining_heat_lower * efficiency_ratio +
   HOTWATER_PER_DAY * days_remaining
 gas_need_upper <- remaining_heat_upper * efficiency_ratio +
@@ -158,12 +179,26 @@ gas_need_upper <- remaining_heat_upper * efficiency_ratio +
 daily_rate_suggested_lower <- gas_need_lower / days_remaining
 daily_rate_suggested_upper <- gas_need_upper / days_remaining
 
-# Current daily rate (averaged over last 7 days)
-dat_recent <- obs_days_complete %>%
-  ungroup() %>%
-  filter(Date >= today_date - days(7)) %>%
-  summarise(rate_7d = mean(Rate, na.rm = TRUE))
-current_daily_rate <- dat_recent$rate_7d
+# Current daily rate.
+# NOTE: obs_days_complete only spans up to the last meter
+# reading, so a "last 7 calendar days" window is empty
+# whenever today is >7 days after the latest reading (which
+# is the normal case) and yields NaN. Instead use the rate
+# implied by the most recent meter interval, which is the
+# best estimate of the household's current consumption.
+current_daily_rate <- dat_latest_reading$Rate
+
+# Fallback: if the latest reading has no rate, average the
+# last 7 days of complete observations that actually exist.
+if (length(current_daily_rate) == 0 ||
+    is.na(current_daily_rate)) {
+  last_obs_date <- max(obs_days_complete$Date, na.rm = TRUE)
+  dat_recent <- obs_days_complete %>%
+    ungroup() %>%
+    filter(Date >= last_obs_date - days(7)) %>%
+    summarise(rate_7d = mean(Rate, na.rm = TRUE))
+  current_daily_rate <- dat_recent$rate_7d
+}
 
 
 # ============================================================
@@ -202,8 +237,10 @@ if (budget_surplus_pessimistic > 100) {
   )
 }
 
-# Recent temperature for heat pump note
-recent_tavg <- obs_days_complete %>%
+# Recent temperature for heat pump note.
+# Use meteostat_weather (runs to today), NOT obs_days_complete
+# which stops at the last meter reading and would yield NaN.
+recent_tavg <- meteostat_weather %>%
   ungroup() %>%
   filter(Date >= today_date - days(3)) %>%
   summarise(tavg_3d = mean(tavg, na.rm = TRUE)) %>%
@@ -254,7 +291,7 @@ cat("  Efficiency:      ",
     " m3 per C*day\n")
 cat("\n")
 cat("DAILY RATE:\n")
-cat("  Current (7-day): ",
+cat("  Current (latest interval): ",
     round(current_daily_rate, 2), " m3/day\n")
 cat("  Suggested range: ",
     round(daily_rate_suggested_lower, 2), " - ",
@@ -281,96 +318,83 @@ dat_burndown <- obs_days_complete %>%
   filter(year == current_year) %>%
   mutate(gas_remaining = QUOTA_M3 - Spent)
 
-# Anchor: gas remaining at the last observed day
-gas_remaining_now <- dat_burndown %>%
-  filter(day_in_year == day_in_year_obs) %>%
-  slice(1) %>%
-  pull(gas_remaining)
+# Anchor the forecast at exactly the headline budget figure
+# (gas_budget_left), so the chart's "today" point and the
+# printed "Gas remaining" never disagree. Both are built on
+# the same Jan-1 meter anchor (see section 3).
+gas_remaining_now <- gas_budget_left
 
-# If no exact match, fall back to gas_budget_left
-if (length(gas_remaining_now) == 0 || is.na(gas_remaining_now)) {
-  gas_remaining_now <- gas_budget_left
+# Predicted burn-down.
+#
+# IMPORTANT: use the SAME conditional model that drives the
+# verdict above -- predict_future_needs() -- so the chart, the
+# printed recommendation, and the hand-coded efficiency chart
+# all agree. (A previous version computed a separate
+# conditional-normal band here using an empirical rho matrix;
+# it drifted from both the verdict and the efficiency chart,
+# producing an over-optimistic upper tail that touched the
+# quota line when neither of the other two views did.)
+#
+# predict_future_needs() returns, for every day from today to
+# Dec 31, the conditional 95% band of CUMULATIVE heating need
+# (lower_expected / upper_expected), shrunk toward this year's
+# observed trajectory. We convert each to gas remaining with
+# the same efficiency_ratio + hot-water baseline used for the
+# verdict. More heat needed -> more gas burned -> less budget
+# left, so the heat upper bound maps to the gas LOWER bound.
+
+# predict_future_needs() gives a valid 95% band only at the
+# END of the season (day 365) -- that is all the verdict uses.
+# For intermediate days its prop_var term can go negative and
+# the band inverts, so we do NOT use it to draw the trajectory.
+#
+# Instead we draw a band that is guaranteed self-consistent:
+#   - The MEAN line follows the seasonal shape of how heat
+#     actually accrues (flat in summer, steep in winter), taken
+#     from the unconditional mean curve mean_fun().
+#   - The band WIDTH grows in proportion to the heat accrued so
+#     far, so it is ~0 today and reaches exactly the verdict's
+#     year-end CI on Dec 31. This makes the fan narrow in summer
+#     (little heating, little to be uncertain about) and widen
+#     through autumn/winter (winter severity is the unknown).
+
+future_days   <- seq(day_in_year_obs, 365)
+days_from_now <- future_days - day_in_year_obs
+
+# Expected ADDITIONAL heat need accrued from today to day d
+# (unconditional seasonal shape). At day 365 this equals the
+# conditional remaining-need mean used by the verdict.
+heat_accrued    <- mean_fun(future_days) -
+  mean_fun(day_in_year_obs)
+heat_accrued    <- pmax(heat_accrued, 0)
+heat_accrued_eos <- heat_accrued[length(heat_accrued)]
+heat_frac        <- if (heat_accrued_eos > 0) {
+  heat_accrued / heat_accrued_eos
+} else {
+  rep(0, length(heat_accrued))
 }
 
-# Predicted burn-down: ANALYTIC conditional normal
-#
-# We already have everything we need from iter4's real data:
-#   sds$mean_pred — GLS-smoothed mean of cumulative heat at each day
-#   sds$sd_pred   — smoothed SD across 20+ observed years
-# We compute rho(today, d) empirically from obs_days_complete.
-#
-# Conditional normal:
-#   z0 = (h0 - mu_today) / sigma_today
-#   E[H(d)|h0] = mu(d) + rho(today,d) * sigma(d) * z0
-#   SD[H(d)|h0] = sigma(d) * sqrt(1 - rho(today,d)^2)
-#
-# Bands are symmetric (mean ± z * SD), and widen monotonically
-# because rho drops as d moves further from today.
-
-# Step 1: Pivot real data to wide matrix (rows = years, cols = days)
-obs_wide <- obs_days_complete %>%
-  dplyr::filter(day_in_year <= 365) %>%
-  dplyr::select(year, day_in_year, tavg_low_cumul) %>%
-  dplyr::group_by(year, day_in_year) %>%
-  dplyr::summarise(
-    tavg_low_cumul = max(tavg_low_cumul, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  tidyr::pivot_wider(
-    names_from  = day_in_year,
-    values_from = tavg_low_cumul,
-    names_prefix = "d"
-  )
-obs_mat <- as.matrix(obs_wide[, -1])  # years × days
-
-# Step 2: Get mu(d) and sigma(d) from the GLS model (sds)
-# These are smooth and well-behaved (fit to 20+ years)
-mu_vec    <- sds$mean_pred[1:365]
-sigma_vec <- sds$sd_pred[1:365]
-
-# Step 3: Current position and z-score
-mu_today    <- mu_vec[day_in_year_obs]
-sigma_today <- sigma_vec[day_in_year_obs]
-z0 <- (cum_heat_now - mu_today) / sigma_today
-
-# Step 4: Empirical correlation rho(today, d) from real years
-today_vec <- obs_mat[, day_in_year_obs]
-future_days <- seq(day_in_year_obs, 365)
-
-rho_vec <- cor(
-  today_vec,
-  obs_mat[, future_days],
-  use = "pairwise.complete.obs"
-)[1, ]
-# Replace any NA with the last valid rho (edge days)
-rho_vec[is.na(rho_vec)] <- 0.5
-
-# Step 5: Conditional distribution at each future day
-cond_mean <- mu_vec[future_days] +
-  rho_vec * sigma_vec[future_days] * z0
-cond_sd <- sigma_vec[future_days] *
-  sqrt(pmax(0, 1 - rho_vec^2))
-
-# Step 6: Convert to gas remaining
-# Additional heat from today to day d (conditional)
-delta_heat_mean <- cond_mean - cum_heat_now
-days_from_now   <- future_days - day_in_year_obs
-delta_gas_mean  <- efficiency_ratio * delta_heat_mean +
+# Mean gas used by day d = heating gas (efficiency x heat
+# accrued) + hot water (baseline x days elapsed). The hot
+# water term keeps the burn-down sloping down gently through
+# the summer even while heating need is ~0.
+gas_used_mean <- efficiency_ratio * heat_accrued +
   HOTWATER_PER_DAY * days_from_now
-delta_gas_sd    <- efficiency_ratio * cond_sd
 
-# Gas remaining = current budget minus expected consumption
-# Bands are symmetric: mean ± z * SD
+# Year-end half-width from the verdict's conditional CI on
+# remaining heat, scaled back along the season by heat_frac.
+half_width_eos <- efficiency_ratio *
+  (remaining_heat_upper - remaining_heat_lower) / 2
+band_half <- half_width_eos * heat_frac
+
 dat_forecast <- data.frame(
   day_in_year       = future_days,
-  gas_forecast_mean = gas_remaining_now - delta_gas_mean,
-  gas_forecast_lwr  = gas_remaining_now - delta_gas_mean -
-    CONF_LEV * delta_gas_sd,
-  gas_forecast_upr  = gas_remaining_now - delta_gas_mean +
-    CONF_LEV * delta_gas_sd,
-  # Diagnostics
-  cond_sd_heat     = cond_sd,
-  rho_with_today   = rho_vec
+  gas_forecast_mean = gas_remaining_now - gas_used_mean,
+  # more heat -> more gas -> less budget left (lower bound)
+  gas_forecast_lwr  = gas_remaining_now - gas_used_mean -
+    band_half,
+  gas_forecast_upr  = gas_remaining_now - gas_used_mean +
+    band_half
 )
 
 # Convert day_in_year to actual Date using lubridate
@@ -401,52 +425,103 @@ dat_anchor <- data.frame(
 )
 dat_forecast_plot <- bind_rows(dat_anchor, dat_forecast)
 
-# Quarter break dates for x-axis (lubridate)
-quarter_dates <- make_date(
-  current_year, c(1, 4, 7, 10), 1
+# X-axis breaks: 1st of every second month (Jan, Mar, ..., Nov)
+# plus the last day of the year, so both Jan and Dec are
+# labelled and the quota deadline (Dec 31) is marked.
+axis_breaks <- c(
+  make_date(current_year, c(1, 3, 5, 7, 9, 11), 1),
+  make_date(current_year, 12, 31)
+)
+axis_labels <- c(
+  format(make_date(current_year, c(1, 3, 5, 7, 9, 11), 1), "%b"),
+  "Dec 31"
+)
+
+# Probability of overshooting the quota at year-end:
+# P(gas_forecast_end < 0).
+end_fc <- dat_forecast[nrow(dat_forecast), ]
+end_sd <- (end_fc$gas_forecast_upr - end_fc$gas_forecast_mean) /
+  CONF_LEV
+prob_overshoot <- if (end_sd > 0) {
+  round(100 * pnorm(0, mean = end_fc$gas_forecast_mean,
+                    sd = end_sd, lower.tail = TRUE))
+} else {
+  ifelse(end_fc$gas_forecast_mean < 0, 100, 0)
+}
+
+# Subtitle carries the verdict + the numbers that matter
+burndown_subtitle <- sprintf(
+  paste0("As of %s: %s m3 used, %s m3 left. ",
+         "Projected year-end: %s m3 (range %s to %s). ",
+         "Chance of overshooting quota: ~%s%%."),
+  format(today_date, "%b %d"),
+  round(gas_consumed), round(gas_budget_left),
+  round(end_fc$gas_forecast_mean),
+  round(end_fc$gas_forecast_lwr),
+  round(end_fc$gas_forecast_upr),
+  prob_overshoot
+)
+
+# A small label anchored at "today" on the observed line
+dat_today_label <- data.frame(
+  plot_date = anchor_date,
+  y         = gas_remaining_now,
+  lab       = paste0("Today: ", round(gas_remaining_now),
+                     " m3 left")
 )
 
 fig_burndown <-
   ggplot() +
-  theme_bw() +
-  # Observed gas remaining (ends at today)
-  geom_line(
-    data = dat_burndown_plot,
-    aes(x = plot_date, y = gas_remaining),
-    color = "navy", linewidth = 1.2
+  theme_minimal(base_size = 13) +
+  # Penalty zone: below the quota line (gas_remaining < 0)
+  annotate("rect",
+    xmin = make_date(current_year, 1, 1),
+    xmax = make_date(current_year, 12, 31),
+    ymin = -200, ymax = 0,
+    fill = "red", alpha = 0.06
   ) +
-  # Forecast ribbon (starts from today)
+  # Forecast ribbon: the "uncertain future" (which winter we get)
   geom_ribbon(
     data = dat_forecast_plot,
-    aes(
-      x = plot_date,
-      ymin = gas_forecast_lwr,
-      ymax = gas_forecast_upr
-    ),
-    fill = "salmon", alpha = 0.3
+    aes(x = plot_date,
+        ymin = gas_forecast_lwr, ymax = gas_forecast_upr),
+    fill = "#d1495b", alpha = 0.18
   ) +
-  # Forecast mean line (same extent as ribbon)
+  # Forecast mean line
   geom_line(
     data = dat_forecast_plot,
     aes(x = plot_date, y = gas_forecast_mean),
-    color = "red", linetype = "dashed", linewidth = 1
+    color = "#d1495b", linetype = "dashed", linewidth = 0.9
   ) +
-  # Zero line (budget exhausted)
-  geom_hline(
-    yintercept = 0,
-    color = "red", linetype = "dashed", linewidth = 0.5
+  # Observed gas remaining: the "certain past"
+  geom_line(
+    data = dat_burndown_plot,
+    aes(x = plot_date, y = gas_remaining),
+    color = "#13315c", linewidth = 1.6
   ) +
-  # Current day marker
+  # Quota-exhausted line
+  geom_hline(yintercept = 0, color = "red", linewidth = 0.6) +
+  # "Today" marker + point + label
   geom_vline(
     xintercept = anchor_date,
-    color = "grey50", linetype = "dotted"
+    color = "grey55", linetype = "dotted"
+  ) +
+  geom_point(
+    data = dat_today_label,
+    aes(x = plot_date, y = y),
+    color = "#13315c", size = 2.6
+  ) +
+  geom_label(
+    data = dat_today_label,
+    aes(x = plot_date, y = y, label = lab),
+    hjust = 1.05, vjust = -0.4, size = 3.4,
+    label.size = 0, fill = "white", color = "#13315c"
   ) +
   scale_x_date(
-    breaks = quarter_dates,
-    date_labels = "%b",
-    limits = make_date(
-      current_year, c(1, 12), c(1, 31)
-    )
+    breaks = axis_breaks,
+    labels = axis_labels,
+    limits = make_date(current_year, c(1, 12), c(1, 31)),
+    expand = expansion(mult = c(0.01, 0.04))
   ) +
   scale_y_continuous(
     limits = c(-200, QUOTA_M3),
@@ -455,7 +530,21 @@ fig_burndown <-
   labs(
     x = "",
     y = "Gas budget remaining (m³)",
-    title = "Budget burn-down with forecast (Jan\u2013Dec)"
+    title = paste0("Gas budget burn-down \u2014 verdict: ",
+                   decision),
+    subtitle = burndown_subtitle,
+    caption = paste0(
+      "Solid navy = actual consumption (certain).  ",
+      "Dashed red + shaded band = forecast for the rest of ",
+      "the year;\nwider band = more winter uncertainty.  ",
+      "Below the red line = over quota (penalty price)."
+    )
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(color = "grey25", size = 10),
+    plot.caption = element_text(hjust = 0, color = "grey45"),
+    panel.grid.minor = element_blank()
   )
 
 
@@ -483,12 +572,27 @@ decision_snapshot <- list(
   ),
   decision          = decision,
   decision_detail   = decision_detail,
-  recent_tavg       = recent_tavg
+  recent_tavg       = recent_tavg,
+  prob_overshoot    = prob_overshoot,
+  current_year      = current_year,
+  days_elapsed      = days_elapsed,
+  days_remaining    = days_remaining,
+  budget_surplus    = c(
+    pessimistic = budget_surplus_pessimistic,
+    optimistic  = budget_surplus_optimistic
+  ),
+  forecast_year_end = c(
+    mean  = end_fc$gas_forecast_mean,
+    lower = end_fc$gas_forecast_lwr,
+    upper = end_fc$gas_forecast_upr
+  )
 )
 
 save(
   decision_snapshot,
   fig_burndown,
+  dat_burndown_plot,
+  dat_forecast_plot,
   file = here::here("data", "decision_snapshot.Rdata")
 )
 

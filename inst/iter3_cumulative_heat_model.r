@@ -19,8 +19,10 @@ source(here::here("inst", "function", "load_stuff.r"))
 # 1. Constants
 # ============================================================
 
-# Current year of analysis -- change each season
-ACT_YEAR <- 2025
+# Current year of analysis. Track the calendar year we are
+# actually in, rather than a hard-coded value that silently
+# leaves the report showing last year's data.
+ACT_YEAR <- lubridate::year(Sys.Date())
 
 
 # ============================================================

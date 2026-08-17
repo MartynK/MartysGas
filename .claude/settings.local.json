@@ -79,7 +79,8 @@
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter4_conditional_prediction.r)",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/iter5_decision_tool.r)",
       "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"load\\(''C:/Users/mrkma/OneDrive/DKM/Stats_R/R/MartysGas/data/cumulative_heat_models.Rdata''\\); library\\(dplyr\\); obs_days_complete %>% filter\\(Spent > 0\\) %>% group_by\\(year\\) %>% summarise\\(n=n\\(\\), min_day=min\\(day_in_year\\), max_day=max\\(day_in_year\\), max_spent=round\\(max\\(Spent,na.rm=TRUE\\)\\)\\) %>% print\\(n=30\\)\")",
-      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_check_meter.r)"
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" inst/extdata/_check_meter.r)",
+      "Bash(\"C:/Program Files/R/R-4.5.2/bin/Rscript.exe\" -e \"suppressMessages\\(library\\(readxl\\)\\); d<-read_excel\\('inst/extdata/gaz.xlsx',sheet='Mero_rendetlen'\\); print\\(tail\\(as.data.frame\\(d\\),5\\)\\)\")"
     ],
     "deny": []
   }
