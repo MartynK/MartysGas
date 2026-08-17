@@ -244,9 +244,24 @@ for (i in 1:366) {
   }
 }
 
-# Fit a smooth spline to the correlation curve
+# Fit a smooth spline to the correlation curve.
+#
+# NOTE: this previously used `ns(day_in_year, df = 3) - 1`.
+# Suppressing the intercept is wrong here: every ns() basis
+# function is 0 at the left boundary knot, so the fit was
+# forced through ~0 on Jan 1 even though the observed
+# correlation there is ~0.81. With only 3 df the curve then
+# had to arc up steeply and overshoot mid-year, producing a
+# spurious maximum around day 150 and a DECLINE through late
+# summer. Downstream that made the end-of-year prediction band
+# grow wider as the year progressed -- the opposite of the
+# truth, since uncertainty about a fixed endpoint can only
+# shrink as more of the year is observed.
+#
+# Keep the intercept and allow enough df to follow the gently
+# rising empirical curve (~0.81 in January to 1.0 on Dec 31).
 mod_cor <- lm(
-  cor_z ~ ns(day_in_year, df = 3) - 1,
+  cor_z ~ ns(day_in_year, df = 6),
   data = sds
 )
 
@@ -258,12 +273,36 @@ fig_cor_eff <- capture_plot(
     plot()
 )
 
-# Normalize predicted correlations so the max is 1.0
+# Clamp predictions to the valid correlation range [0, 1].
+#
+# NOTE: this previously divided by max(cor_z_pred), which
+# pinned whatever the spline's peak happened to be to exactly
+# 1.0 and rescaled everything else downwards. Combined with
+# the no-intercept fit above, that peak sat mid-year and made
+# the correlation appear to fall through the autumn. The
+# observed correlation already reaches 1.0 at day 365 by
+# construction (z_final against itself), so a correct fit
+# needs no rescaling -- only clamping against numerical
+# overshoot.
 sds$cor_z_pred <- predict(mod_cor, newdata = sds)
 sds <- sds %>%
+  arrange(day_in_year) %>%
   mutate(
-    cor_z_pred = cor_z_pred / max(cor_z_pred, na.rm = TRUE)
+    cor_z_pred = pmin(pmax(cor_z_pred, 0), 1)
   )
+
+# Enforce a non-decreasing correlation curve.
+#
+# For a cumulative process with near-independent increments,
+# cor(h_d, h_365) = sd(h_d) / sd(h_365), which can only rise
+# as d advances: observing more of the year can never make the
+# fixed year-end total LESS predictable. The spline still
+# wiggles by a few percent where the empirical curve is flat
+# and noisy (30 years of data), which would otherwise let the
+# forecast band widen slightly from one week to the next.
+# cummax() removes those reversals without touching the shape.
+idx_ok <- !is.na(sds$cor_z_pred)
+sds$cor_z_pred[idx_ok] <- cummax(sds$cor_z_pred[idx_ok])
 
 # Correlation interpolation function for downstream use
 cor_fun <- approxfun(sds$day_in_year, sds$cor_z_pred)
