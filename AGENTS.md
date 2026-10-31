@@ -46,3 +46,9 @@
 - Optional Ubuntu R packages live at:
   - `/mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/_Libraries/_Ubuntu_packages`
   - Activate with: `.libPaths(c('/mnt/c/Users/mrkma/OneDrive/DKM/Stats_R/R/_Libraries/_Ubuntu_packages', .libPaths()))`
+
+## Carbon monoxide logger (since 2026-10-31)
+- `inst/extdata/co_logger/`: raw Lascar EL-USB-CO EasyLog exports from the bathroom next to the Bosch Therm 4200 open-flue water heater. Never edit; add new exports beside them. The logger holds 32,510 readings and stops when full (v5 filled 2026-10-31 00:43).
+- `R/read_co_logger.R`: stacks the exports; logger clock is parsed as naive time (no DST).
+- `inst/co1_events.r` (sources `inst/co1b_cohb_and_figures.r`): events (>= 10 ppm, merged within 10 min), per-event peak, dose, decay rate, worst-case COHb by CFK; like-for-like event rates at 60 s; daily baseline outside events. Output `data/co_events.Rdata`, `inst/sideffects/co_*.png`, `inst/sideffects/co_events.csv`.
+- History and reasoning: `JOURNAL.md`.
