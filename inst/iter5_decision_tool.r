@@ -142,6 +142,16 @@ remaining_heat_lower <- end_of_season$lower_expected -
 remaining_heat_upper <- end_of_season$upper_expected -
   cum_heat_now
 
+# Point estimate of the remaining heat need. The conditional
+# band is normal and symmetric, so its midpoint is the mean
+# (and the median). Taken from the unclamped bounds so the
+# zero-clamp below cannot drag it.
+remaining_heat_mean <- max(
+  (end_of_season$lower_expected +
+     end_of_season$upper_expected) / 2 - cum_heat_now,
+  0
+)
+
 # Clamp negatives (if season is almost over)
 remaining_heat_lower <- max(remaining_heat_lower, 0)
 remaining_heat_upper <- max(remaining_heat_upper, 0)
@@ -173,6 +183,8 @@ if (cum_heat_now > 0 && !is.na(dat_current$Spent)) {
 gas_need_lower <- remaining_heat_lower * efficiency_ratio +
   HOTWATER_PER_DAY * days_remaining
 gas_need_upper <- remaining_heat_upper * efficiency_ratio +
+  HOTWATER_PER_DAY * days_remaining
+gas_need_mean  <- remaining_heat_mean * efficiency_ratio +
   HOTWATER_PER_DAY * days_remaining
 
 # Suggested daily rate to stay within budget
@@ -210,6 +222,7 @@ if (length(current_daily_rate) == 0 ||
 # Negative = we risk exceeding the quota.
 budget_surplus_pessimistic <- gas_budget_left - gas_need_upper
 budget_surplus_optimistic  <- gas_budget_left - gas_need_lower
+budget_surplus_mean        <- gas_budget_left - gas_need_mean
 
 # Decision thresholds (m3) — based on pessimistic scenario
 if (budget_surplus_pessimistic > 100) {
@@ -279,13 +292,17 @@ cat("  Gas consumed:  ", round(gas_consumed, 1),
     " m3 of ", QUOTA_M3, " m3 quota\n")
 cat("  Gas remaining: ", round(gas_budget_left, 1), " m3\n")
 cat("\n")
-cat("EXPECTED REMAINING NEED (95% CI):\n")
-cat("  Heat need left:  ",
-    round(remaining_heat_lower), " - ",
-    round(remaining_heat_upper), " C*days\n")
-cat("  Gas need left:   ",
-    round(gas_need_lower, 1), " - ",
-    round(gas_need_upper, 1), " m3\n")
+cat("EXPECTED REMAINING NEED (mean, 95% CI):\n")
+cat("  Heat need left:  ", round(remaining_heat_mean),
+    "  (", round(remaining_heat_lower), " - ",
+    round(remaining_heat_upper), ") C*days\n")
+cat("  Gas need left:   ", round(gas_need_mean, 1),
+    "  (", round(gas_need_lower, 1), " - ",
+    round(gas_need_upper, 1), ") m3\n")
+cat("  Year-end balance:", round(budget_surplus_mean, 1),
+    "  (", round(budget_surplus_pessimistic, 1), " to ",
+    round(budget_surplus_optimistic, 1), ") m3",
+    "  [negative = over quota]\n")
 cat("  Efficiency:      ",
     round(efficiency_ratio, 3),
     " m3 per C*day\n")
@@ -449,6 +466,9 @@ prob_overshoot <- if (end_sd > 0) {
   ifelse(end_fc$gas_forecast_mean < 0, 100, 0)
 }
 
+cat("  Chance of exceeding the quota by Dec 31: ~",
+    prob_overshoot, "%\n\n", sep = "")
+
 # Subtitle carries the verdict + the numbers that matter
 burndown_subtitle <- sprintf(
   paste0("As of %s: %s m3 used, %s m3 left. ",
@@ -557,10 +577,12 @@ decision_snapshot <- list(
   gas_consumed      = gas_consumed,
   gas_budget_left   = gas_budget_left,
   remaining_heat    = c(
+    mean  = remaining_heat_mean,
     lower = remaining_heat_lower,
     upper = remaining_heat_upper
   ),
   gas_need          = c(
+    mean  = gas_need_mean,
     lower = gas_need_lower,
     upper = gas_need_upper
   ),
@@ -578,6 +600,7 @@ decision_snapshot <- list(
   days_elapsed      = days_elapsed,
   days_remaining    = days_remaining,
   budget_surplus    = c(
+    mean        = budget_surplus_mean,
     pessimistic = budget_surplus_pessimistic,
     optimistic  = budget_surplus_optimistic
   ),
